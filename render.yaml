@@ -76,5 +76,11 @@ services:
         sync: false
       - key: NYLAS_CLIENT_ID
         sync: false
+      # Set this AFTER creating the webhook destination in Nylas. Nylas mints the secret per
+      # destination at creation time and the docs do not promise it can be read back, so capture
+      # it from the creation response. Until it is set, the webhook endpoint answers Nylas's
+      # challenge but refuses to process notifications - see server/api/nylas/webhooks.js.
+      - key: NYLAS_WEBHOOK_SECRET
+        sync: false
       - key: REACT_APP_STRIPE_PUBLISHABLE_KEY
         sync: false

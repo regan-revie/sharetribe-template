@@ -16,6 +16,7 @@ const transactionLineItems = require('./api/transaction-line-items');
 const initiatePrivileged = require('./api/initiate-privileged');
 const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
+const nylasWebhooks = require('./api/nylas/webhooks');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -56,6 +57,22 @@ router.post('/transaction-line-items', transactionLineItems);
 router.post('/initiate-privileged', initiatePrivileged);
 router.post('/transition-privileged', transitionPrivileged);
 router.post('/delete-account', deleteAccount);
+
+// Nylas webhooks.
+//
+// These carry their own JSON body parser instead of relying on the Transit middleware above.
+// Nylas sends plain application/json, which that middleware leaves unparsed, and the webhook
+// signature is an HMAC over the exact bytes sent - so `verify` stashes the raw buffer before
+// anything can reserialise it. Scoped to this route so the Transit endpoints are untouched.
+const nylasRawJson = bodyParser.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  },
+});
+
+// GET answers Nylas's ?challenge= ownership check; POST receives signed notifications.
+router.get('/nylas/webhooks', nylasWebhooks.challenge);
+router.post('/nylas/webhooks', nylasRawJson, nylasWebhooks.receive);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed
