@@ -31,6 +31,12 @@ Two things the template does not give us for free here:
 - **The Integration SDK is not installed.** `package.json` has `sharetribe-flex-sdk` but not `sharetribe-flex-integration-sdk`. `getTrustedSdk` works by exchanging the *logged-in user's* cookie token, so it cannot serve a user-less webhook. Webhook-driven transitions need the Integration SDK plus `SHARETRIBE_INTEGRATION_CLIENT_ID` / `_SECRET`.
 - **`server/apiRouter.js` only parses `application/transit+json`.** A plain-JSON webhook POST arrives unparsed, and there is no CSRF protection or request authentication anywhere in the codebase. A webhook route needs its own `bodyParser.json({ verify })` to keep the raw body for Nylas's HMAC-SHA256 signature check, and every new state-changing endpoint must identify its caller with an SDK call before acting.
 
+### The connected Sharetribe environment (`revie_dev`)
+Two settings on this marketplace shape how the booking flow has to work. Neither is visible in the repo — they come from the `/general/access-control.json` hosted asset, and both were confirmed against the live API:
+
+- **`marketplace.private: true`.** Anonymous visitors cannot browse listings at all; an unauthenticated `sdk.listings.query` returns 403, which is correct behaviour rather than a misconfiguration. Every client is therefore logged in well before they reach a booking UI, which means a logged-in session is always available and the client-side privileged-transition path through `getTrustedSdk` can always be used. Note also that private mode makes `/s*` paths significant — see the comments in `src/routing/routeConfiguration.js` and `server/resources/robotsPrivateMarketplace.txt`.
+- **`listings.requireApprovalToPublish: true`.** A coach's listing is not live until an admin approves it, so the calendar-connect onboarding step happens before that gate, not after.
+
 ### Keeping the fork mergeable
 This repo tracks `sharetribe/web-template` as the `upstream` git remote (origin is `regan-revie/sharetribe-template`) and periodically merges upstream releases — `v12.3.0` was the most recent. To keep those merges painless, prefer **adding new files** over editing core `src/` files, and concentrate custom logic in `server/api/`, `ext/`, and clearly named new modules. When a core file genuinely must change, keep the diff small and leave a comment explaining why.
 
@@ -67,10 +73,10 @@ Sharetribe's built-in calendar can't do these:
 - Nylas hands-on checks (see decision above): Apple/iCloud connect UX, free/low-tier webhook payload completeness, reminder-email customization limits per tier.
 - (Superseded, no longer relevant: an earlier question about Cal.com's "active user billing" vs "high water mark" billing — moot now that we've moved to Nylas.)
 
-## Current state — we are at Phase 1, and Phase 1 is not yet proven
-As of the last update, the only non-upstream commits in this repo are the ones that added this file. There is **no custom code yet**, and the template has never been demonstrated running against the Sharetribe test environment. Prove that before writing any integration code.
+## Current state — Phase 1 is done; Phase 2 is blocked on credentials
+**Phase 1 is proven.** The stock template runs locally against the `revie_dev` environment: `yarn dev` serves the frontend on :3000 and the API server on :3500, 1Password resolves both Sharetribe credentials through `op run`, the hosted config assets load from the Marketplace API, and the app renders in the browser. Aside from this file there is still **no custom code** — the repo is otherwise a clean fork of upstream.
 
-Blocked on credentials that don't exist yet:
+Phase 2 is blocked on credentials that don't exist yet:
 - A **Nylas account** → API key, client ID, webhook signing secret.
 - A **Google Cloud project** (Calendar API + OAuth client) and an **Azure app registration**, both with the Nylas callback URI registered. Google calendar scopes are *restricted*, so Google's verification is on the critical path to launch even though test users work immediately.
 - **Nylas whitelabel setup**: Revie logo, `auth.heyrevie.com` hostname, DNS records.
@@ -81,8 +87,8 @@ Also currently incomplete: the 1Password CLI is installed but **not signed in** 
 Not in scope yet, but worth keeping the architecture compatible: Regan wants discount codes, and there's an existing Stripe integration via Sharetribe. The planned approach (confirmed against Sharetribe's own docs, which use "validating a discount code" as their canonical example for privileged transitions): client submits a code with the booking request → the trusted backend (the same one built for the calendar integration) validates it against a small store of valid codes → backend calls a privileged transition (`privileged-set-line-items`) to recompute Sharetribe's line items with a discount line item → Sharetribe charges the discounted total through its existing Stripe Connect flow, unchanged. No need to touch Stripe's own Coupon/PromotionCode objects. When this project starts, it should mostly be "one more privileged transition + a table of codes" on top of the backend this project builds — don't build the calendar backend in a way that makes that harder later.
 
 ## Phased plan
-1. **Foundation** — get the stock web-template running locally against the Sharetribe test environment. No customization yet; just prove the baseline works.
-2. **Calendar wiring** — sign up for Nylas free tier; verify the open questions above hands-on; build the coach onboarding flow (Custom Authentication calendar connect, event-type opt-in that creates a Scheduler Configuration via API, per-coach webhook registration), the inline booking UI on a coach profile, our own confirmation/reminder emails, and the Sharetribe transaction-process changes (privileged transitions) needed to confirm bookings. All against test data.
+1. ~~**Foundation**~~ — **done.** The stock web-template runs locally against the `revie_dev` environment; see "Current state" above.
+2. **Calendar wiring** — sign up for Nylas free tier; verify the open questions above hands-on; build the coach onboarding flow (whitelabeled Hosted Authentication calendar connect, event-type opt-in that creates a Scheduler Configuration via API, per-coach webhook registration), the inline booking UI on a coach profile, our own confirmation/reminder emails, and the Sharetribe transaction-process changes (privileged transitions) needed to confirm bookings. All against test data.
 3. **Hardening** — reschedules/cancellations initiated from the calendar side, timezone edge cases, abandoned-booking handling.
 4. **Go-live** — upgrade to Sharetribe Extend, deploy to Render, point at the live marketplace, onboard real coaches (Nylas calendar connect + event-type selection).
 
