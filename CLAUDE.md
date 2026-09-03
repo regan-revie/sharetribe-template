@@ -5,6 +5,31 @@ This repo is a fork of `sharetribe/web-template`, the client app for a coach<>cl
 ## Goal
 Replace/extend Sharetribe's built-in booking calendar with a real calendar/scheduling integration (Nylas), so clients book coaching sessions against a coach's actual connected calendar while Sharetribe continues to handle listings, coach<>client matching, and payment (Stripe Connect, via Sharetribe).
 
+## Working in this repo
+
+### Commands
+- Package manager is **yarn** (not npm). Node `^22.22.0 || >=24.0.0`.
+- **Run the app:** `op run --env-file=.env -- yarn dev` — starts the React frontend (`scripts/start.js`) and the Express backend (`nodemon server/apiServer.js`) together; backend API on port 3500. The `op run` wrapper injects secrets from 1Password (see the secrets decision below); plain `yarn dev` still runs but without real secrets.
+- **Tests:** `yarn test` (client, Jest) and `yarn test-server` (Express server tests). `yarn test-ci` runs both.
+- **Format:** `yarn format` (Prettier over `**/*.{js,css}`); CI enforces it via `yarn format-ci`.
+- **Config:** `yarn config-check` validates `config/` against the connected Sharetribe environment. `yarn build` produces the production bundle; `yarn start` serves it.
+
+### Repo map
+- `src/containers/` — page-level React components. Each container usually has its own `*.duck.js` holding that page's Redux state, action creators, and async thunks.
+- `src/ducks/` — global Redux modules (auth, current user, etc.). `src/reducers.js` and `src/store.js` wire everything together.
+- `src/components/` — shared presentational components. `src/util/` — helpers (dates, currency, API, validation). `src/transactions/` — client-side transaction-process helpers.
+- `config/` — marketplace configuration (branding, listing types, transaction settings), validated by `yarn config-check`.
+- `server/` — the Express server: server-side rendering (`server/renderer.js`) plus API endpoints (`server/apiRouter.js` → `server/api/`).
+- `server/api/` — server-only endpoints. **Privileged transitions already live here:** `initiate-privileged.js`, `transition-privileged.js`, `transaction-line-items.js`. New privileged/webhook endpoints for the Nylas backend belong here (or a sibling folder), registered in `server/apiRouter.js`.
+- `ext/transaction-processes/` — reference copies of the Sharetribe transaction processes (`default-booking`, etc.), each with a `process.edn` definition and a `templates/` folder of notification emails. These are edited here and pushed to Sharetribe with the Sharetribe CLI; the *active* processes actually live in Sharetribe Console.
+- `patches/` — `patch-package` patches (currently `final-form` and `@testing-library/user-event`), reapplied on every `yarn install` via the `postinstall` script. If a dependency behaves unexpectedly, check here first.
+
+### "Our own backend" — TODO, decide and record here
+It is not yet decided whether the Nylas webhook handler and privileged-transition caller live inside this repo's `server/` directory or as a separate service. This affects where new code goes and how it's deployed. Until it's decided, assume `server/` and keep the Nylas code in its own subfolder so it can be extracted later without untangling it from template code.
+
+### Keeping the fork mergeable
+This repo tracks `sharetribe/web-template` as the `upstream` git remote (origin is `regan-revie/sharetribe-template`) and periodically merges upstream releases — `v12.3.0` was the most recent. To keep those merges painless, prefer **adding new files** over editing core `src/` files, and concentrate custom logic in `server/api/`, `ext/`, and clearly named new modules. When a core file genuinely must change, keep the diff small and leave a comment explaining why.
+
 ## Who you're working with
 Regan is the founder of Revie. Philip is the technical collaborator handling engineering on this project (not the founder) — he's comfortable with git, GitHub, and the command line from data-analysis work, but is newer to web development and React/Redux specifically. Explain web-dev-specific concepts as you go rather than assuming prior front-end experience. Favor small, reviewable changes with clear commit messages — this will become a live business, and Philip needs to be able to follow what changed and why.
 
