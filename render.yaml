@@ -22,8 +22,11 @@ services:
     region: frankfurt
     branch: main
 
-    # postinstall runs patch-package, so the patches/ fixes are applied here too.
-    buildCommand: yarn install --frozen-lockfile && yarn build
+    # --production=false is required: NODE_ENV=production (set below, and correct for
+    # running the app) makes yarn skip devDependencies, but the entire CRA build
+    # toolchain - bfj, webpack, chalk - lives in devDependencies, so the build fails
+    # immediately without it. postinstall also runs patch-package here.
+    buildCommand: yarn install --frozen-lockfile --production=false && yarn build
     startCommand: yarn start
     healthCheckPath: /
 
