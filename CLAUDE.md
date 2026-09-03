@@ -78,6 +78,10 @@ Sharetribe's built-in calendar can't do these:
 
 ## Open questions
 - Nylas hands-on checks (see decision above): Apple/iCloud connect UX, free/low-tier webhook payload completeness, reminder-email customization limits per tier.
+- **Which Nylas tier does Revie need, and when should it upgrade?** Two things must be settled before paying, and both are cheap to answer:
+  1. **Confirm with Nylas support that "bring your own auth" is included on Essentials ($15/month).** The pricing page is ambiguous on that row, and the whole case for Essentials over Pro rests on it. If it turns out to be Pro-only, requirement #1 costs about $49/month plus add-ons instead of $15.
+  2. **Test whether passing `provider=google` on `/v3/connect/auth` skips Nylas's provider-picker screen.** This determines how visible the Nylas-hosted step actually is, and therefore whether the Pro-only Hosted Auth branding and custom CNAME add-ons are worth buying at all. Picker behaviour does not depend on tier, so **this is testable on the free Sandbox now** and falls out naturally while building the coach connect flow.
+- **When does the app leave Sandbox?** Nothing in the integration can carry Revie branding or narrowed scopes until it does, so this gates the polish rather than the build. It must happen before real coaches connect.
 - (Superseded, no longer relevant: an earlier question about Cal.com's "active user billing" vs "high water mark" billing — moot now that we've moved to Nylas.)
 
 ## Current state — Phase 1 is done; Phase 2 is blocked on credentials
