@@ -77,7 +77,7 @@ Sharetribe's built-in calendar can't do these:
 **Phase 1 is proven.** The stock template runs locally against the `revie_dev` environment: `yarn dev` serves the frontend on :3000 and the API server on :3500, 1Password resolves both Sharetribe credentials through `op run`, the hosted config assets load from the Marketplace API, and the app renders in the browser. Aside from this file there is still **no custom code** — the repo is otherwise a clean fork of upstream.
 
 Phase 2 is blocked on credentials that don't exist yet:
-- A **Nylas account** → API key, client ID, webhook signing secret.
+- A **Nylas account** → API key and client ID (both on the Dashboard Overview page for the application). The **webhook signing secret is not a prerequisite** and cannot be fetched up front: Nylas mints a distinct `webhook_secret` per webhook *destination*, at the moment that destination is created, and creating one requires a publicly reachable HTTPS URL that answers a `?challenge=` GET within 10 seconds. So the secret is an output of building the webhook endpoint, not an input — and dev (via a tunnel) and production (Render) get **different** secrets, so expect two 1Password items rather than one. Capture the value from the creation response; the docs don't promise it is retrievable afterwards.
 - A **Google Cloud project** (Calendar API + OAuth client) and an **Azure app registration**, both with the Nylas callback URI registered. Google calendar scopes are *restricted*, so Google's verification is on the critical path to launch even though test users work immediately.
 - **Nylas whitelabel setup**: Revie logo, `auth.heyrevie.com` hostname, DNS records.
 
