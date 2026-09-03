@@ -1,0 +1,77 @@
+# Render Blueprint for the Revie dev environment.
+#
+# Why this exists: the Nylas webhook receiver needs a publicly reachable HTTPS
+# URL before Nylas will issue a webhook signing secret, so Render comes early
+# rather than at go-live. Keeping the service definition here means the config
+# is reviewable in git rather than clicked into a dashboard and forgotten.
+#
+# To use: Render dashboard -> New -> Blueprint -> point at this repo. Render
+# reads this file and creates the service. Values marked `sync: false` are NOT
+# set from this file; you enter them in the Render dashboard so secrets never
+# land in git.
+#
+# Note the plan: `free` will not work. Free services sleep after inactivity and
+# cold-start in 30+ seconds, while Nylas's webhook challenge times out at 10
+# seconds, and a sleeping instance silently misses live booking notifications.
+
+services:
+  - type: web
+    name: revie-dev
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+
+    # postinstall runs patch-package, so the patches/ fixes are applied here too.
+    buildCommand: yarn install --frozen-lockfile && yarn build
+    startCommand: yarn start
+    healthCheckPath: /
+
+    envVars:
+      # Matches the local development version; see "engines" in package.json.
+      - key: NODE_VERSION
+        value: "24.20.0"
+      - key: NODE_ENV
+        value: production
+      - key: REACT_APP_ENV
+        value: production
+
+      # Render terminates TLS at a reverse proxy. Without these two the app
+      # mis-handles cookies and builds redirect URLs with the wrong scheme.
+      - key: SERVER_SHARETRIBE_TRUST_PROXY
+        value: "true"
+      - key: REACT_APP_SHARETRIBE_USING_SSL
+        value: "true"
+
+      # Start in report mode. Flip to `block` once the Nylas scheduler component
+      # is in and its CSP allowances are confirmed - note the dev API server
+      # applies no CSP at all, so this deploy is the first place violations show.
+      - key: REACT_APP_CSP
+        value: report
+
+      - key: REACT_APP_MARKETPLACE_NAME
+        value: revie_dev
+
+      # US region: the Nylas free sandbox is US-only. Production must move to a
+      # non-sandbox EU application - see CLAUDE.md, this is a go-live blocker.
+      - key: NYLAS_API_BASE_URL
+        value: https://api.us.nylas.com
+
+      # Set in the Render dashboard after the first deploy, to the service's own
+      # public URL (https://<service>.onrender.com), with no trailing slash.
+      - key: REACT_APP_MARKETPLACE_ROOT_URL
+        sync: false
+
+      # Secrets. Copy the values out of the "Revie Dev" 1Password vault into the
+      # Render dashboard. `op run` is a local-development mechanism and does not
+      # apply here, so Render's encrypted env store is these secrets' second home.
+      - key: REACT_APP_SHARETRIBE_SDK_CLIENT_ID
+        sync: false
+      - key: SHARETRIBE_SDK_CLIENT_SECRET
+        sync: false
+      - key: NYLAS_API_KEY
+        sync: false
+      - key: NYLAS_CLIENT_ID
+        sync: false
+      - key: REACT_APP_STRIPE_PUBLISHABLE_KEY
+        sync: false
