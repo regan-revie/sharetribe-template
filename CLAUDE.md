@@ -82,6 +82,10 @@ Sharetribe's built-in calendar can't do these:
 - **Which Nylas tier does Revie need, and when should it upgrade?** Two things must be settled before paying, and both are cheap to answer:
   1. **Confirm with Nylas support that "bring your own auth" is included on Essentials ($15/month).** The pricing page is ambiguous on that row, and the whole case for Essentials over Pro rests on it. If it turns out to be Pro-only, requirement #1 costs about $49/month plus add-ons instead of $15.
   2. **Test whether passing `provider=google` on `/v3/connect/auth` skips Nylas's provider-picker screen.** This determines how visible the Nylas-hosted step actually is, and therefore whether the Pro-only Hosted Auth branding and custom CNAME add-ons are worth buying at all. Picker behaviour does not depend on tier, so **this is testable on the free Sandbox now** and falls out naturally while building the coach connect flow.
+- **Should development point at the live Sharetribe marketplace instead of `revie_dev`?** Raised at the end of the first build session on noticing the app is connected to the test environment. This needs deciding deliberately, because it reverses the recorded environment strategy above — develop against a Build-plan TEST environment, move to Extend and live data only at launch — and switching now means the $299/month Extend plan plus running unfinished integration code against real listings, coaches and payments. Before deciding, separate two concerns that this could actually be:
+  - **If the concern is the plan or the data**, the existing strategy already answers it: stay on test until launch. Nothing built so far depends on which environment it points at; it is two environment variables.
+  - **If the concern is that `revie_dev`'s hosted configuration has drifted from the real marketplace** — different listing types, a different transaction process, different branding — then the fix is probably to copy that configuration into the test environment rather than to develop against live. Marketplace config is served from Console as hosted assets, so the two environments diverge silently, and building the booking UI against the wrong listing types or transaction process would waste real work. This is the reading worth checking first.
+  Note there is a `Sharetribe` item in the `Revie` 1Password vault, separate from `sharetribe_dev_id` / `sharetribe_dev_secret` in `Revie Dev`, which is presumably the live application's credentials.
 - **When does the app leave Sandbox?** Nothing in the integration can carry Revie branding or narrowed scopes until it does, so this gates the polish rather than the build. It must happen before real coaches connect.
 - (Superseded, no longer relevant: an earlier question about Cal.com's "active user billing" vs "high water mark" billing — moot now that we've moved to Nylas.)
 
@@ -107,6 +111,16 @@ Also currently incomplete: the 1Password CLI is installed but **not signed in** 
 
 ## Backlog — next project after this one: discount codes
 Not in scope yet, but worth keeping the architecture compatible: Regan wants discount codes, and there's an existing Stripe integration via Sharetribe. The planned approach (confirmed against Sharetribe's own docs, which use "validating a discount code" as their canonical example for privileged transitions): client submits a code with the booking request → the trusted backend (the same one built for the calendar integration) validates it against a small store of valid codes → backend calls a privileged transition (`privileged-set-line-items`) to recompute Sharetribe's line items with a discount line item → Sharetribe charges the discounted total through its existing Stripe Connect flow, unchanged. No need to touch Stripe's own Coupon/PromotionCode objects. When this project starts, it should mostly be "one more privileged transition + a table of codes" on top of the backend this project builds — don't build the calendar backend in a way that makes that harder later.
+
+## Next session — start here
+Everything is committed and pushed to `origin/main`, working tree clean. The Render dev service, the webhook receiver and the coach connect flow are all deployed; see "Current state" above for what has been verified.
+
+**Two things are queued and ready to run:**
+
+1. **Register the callback URI in Nylas.** Hosted Authentication → Callback URIs → add `https://revie-dev.onrender.com/api/nylas/callback`. Nylas rejects the flow when `redirect_uri` is not pre-registered, so nothing in the connect flow works until this is done.
+2. **Run the connect flow and watch what the coach actually sees.** Log in to the Render service as a coach, then visit `/api/nylas/connect?provider=google`. This answers the tier question in the open questions below: if `provider=google` goes straight to Google's consent screen, Essentials at $15/month is probably enough and the Pro branding add-ons can be skipped. On Sandbox the consent screen will say Nylas and request the broad default scopes — expected, and irrelevant to what is being tested.
+
+**Then the rest of Phase 2:** Scheduler configuration sync (Revie's event types pushed per coach), the booking UI swap on the listing page, and the Sharetribe transition driven from the webhook. The last needs `sharetribe-flex-integration-sdk` added as a dependency and a durable store for the booking↔transaction mapping.
 
 ## Phased plan
 1. ~~**Foundation**~~ — **done.** The stock web-template runs locally against the `revie_dev` environment; see "Current state" above.
