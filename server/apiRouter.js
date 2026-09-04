@@ -17,6 +17,8 @@ const initiatePrivileged = require('./api/initiate-privileged');
 const transitionPrivileged = require('./api/transition-privileged');
 const deleteAccount = require('./api/delete-account');
 const nylasWebhooks = require('./api/nylas/webhooks');
+const nylasConnect = require('./api/nylas/connect');
+const nylasCallback = require('./api/nylas/callback');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -73,6 +75,12 @@ const nylasRawJson = bodyParser.json({
 // GET answers Nylas's ?challenge= ownership check; POST receives signed notifications.
 router.get('/nylas/webhooks', nylasWebhooks.challenge);
 router.post('/nylas/webhooks', nylasRawJson, nylasWebhooks.receive);
+
+// Coach calendar connection. /connect starts Nylas Hosted Authentication for the logged-in
+// coach; /callback is the redirect_uri Nylas returns them to, and must be registered as a
+// Callback URI on the Nylas application.
+router.get('/nylas/connect', nylasConnect);
+router.get('/nylas/callback', nylasCallback);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed
