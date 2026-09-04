@@ -115,6 +115,14 @@ if (cspEnabled) {
   app.use(
     bodyParser.json({
       type: ['json', 'application/csp-report'],
+      // Keep the unparsed bytes on the request. This parser runs before the /api mount and
+      // matches application/json, so it consumes webhook bodies first - body-parser then skips
+      // the API router's own parser as already-parsed, and its verify hook never fires. The
+      // Nylas webhook signature is an HMAC over exactly these bytes, so without this it can
+      // never be verified in production. See server/api/nylas/signature.js.
+      verify: (req, res, buf) => {
+        req.rawBody = buf;
+      },
     })
   );
 

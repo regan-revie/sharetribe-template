@@ -127,6 +127,20 @@ describe('receive()', () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it('rejects when the raw body was not captured, even with an otherwise valid signature', () => {
+    // Guards a real production failure: a body parser running earlier in the chain consumes the
+    // body, body-parser then skips the API router's parser as already-parsed, its verify hook
+    // never fires, and req.rawBody is undefined. Signatures then fail for genuine requests only,
+    // which looks exactly like a wrong secret. See the verify hook in server/index.js.
+    const { receive } = loadWebhooks(SECRET);
+    const req = signedRequest(booking, SECRET);
+    delete req.rawBody;
+    const res = mockRes();
+    receive(req, res);
+
+    expect(res.statusCode).toBe(401);
+  });
+
   it('accepts and handles a correctly signed booking notification', () => {
     const { receive } = loadWebhooks(SECRET);
     const res = mockRes();
