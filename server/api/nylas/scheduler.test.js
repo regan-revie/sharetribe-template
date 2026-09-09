@@ -198,7 +198,7 @@ describe('scheduling settings', () => {
 describe('cancellation notice', () => {
   const { SCHEDULING_DEFAULTS } = require('./scheduler');
 
-  it('applies a global 24 hour cancellation notice, not a per-coach one', () => {
+  it('applies the global free-cancellation threshold, not a per-coach one', () => {
     const body = buildConfigurationBody({
       eventType: { title: 'T', description: 'd', durationMinutes: 60 },
       coachName: 'C',
@@ -206,7 +206,7 @@ describe('cancellation notice', () => {
       calendarId: 'c@e.com',
       minBookingNoticeMinutes: 72 * 60,
     });
-    expect(body.scheduler.min_cancellation_notice).toBe(24 * 60);
-    expect(SCHEDULING_DEFAULTS.minCancellationNoticeMinutes).toBe(1440);
+    expect(body.scheduler.min_cancellation_notice).toBe(48 * 60);
+    expect(SCHEDULING_DEFAULTS.freeCancellationMinutes).toBe(2880);
   });
 });

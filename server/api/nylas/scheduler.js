@@ -32,14 +32,15 @@ const SCHEDULING_DEFAULTS = {
   // How far into the future the calendar is bookable, in days. Capped below at
   // STRIPE_MAX_BOOKING_DAYS.
   availableDaysInFuture: 30,
-  // How close to a session a client may still cancel through Nylas, in minutes. Platform policy
-  // rather than a coach preference, so this is deliberately not overridable per coach.
+  // The free-cancellation threshold, in minutes: cancel earlier than this and the client is
+  // refunded, cancel later and they are charged. Platform policy rather than a coach preference,
+  // so deliberately not overridable per coach.
   //
-  // NOTE: this is only a barrier in Nylas's own cancellation UI. It is NOT a refund policy - the
-  // Sharetribe process has no partial-refund action at all, so every cancellation route it offers
-  // issues a full refund whatever the timing. Enforcing "cancel inside 24 hours forfeits payment"
-  // needs a new transition with a partial-refund action pushed via the Sharetribe CLI.
-  minCancellationNoticeMinutes: 24 * 60,
+  // NOTE: setting this on the Nylas configuration only *blocks* the cancellation UI inside the
+  // window; it moves no money. The refund half is a Sharetribe concern and does not exist yet -
+  // the process has no partial or zero refund action anywhere, so every cancellation route it
+  // offers issues a full refund whatever the timing. See CLAUDE.md.
+  freeCancellationMinutes: 48 * 60,
 };
 
 /**
@@ -113,7 +114,7 @@ const buildConfigurationBody = ({
     min_booking_notice: resolveMinBookingNotice(minBookingNoticeMinutes),
     available_days_in_future: clampBookingWindow(availableDaysInFuture),
     // Global platform policy, not a coach setting.
-    min_cancellation_notice: SCHEDULING_DEFAULTS.minCancellationNoticeMinutes,
+    min_cancellation_notice: SCHEDULING_DEFAULTS.freeCancellationMinutes,
   },
   event_booking: {
     title: eventType.title,
