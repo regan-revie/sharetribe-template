@@ -60,3 +60,33 @@ describe('toUnixSeconds()', () => {
     expect(toUnixSeconds(Date.parse(iso))).toBe(1788955200);
   });
 });
+
+jest.mock('./client', () => ({ nylasRequest: jest.fn() }));
+const { nylasRequest } = require('./client');
+const { createSession, SESSION_TTL_MINUTES } = require('./availability');
+
+describe('createSession()', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('asks Nylas for a session scoped to one configuration', async () => {
+    nylasRequest.mockResolvedValueOnce({ session_id: 'sess-1' });
+    await expect(createSession('cfg-1')).resolves.toBe('sess-1');
+    expect(nylasRequest).toHaveBeenCalledWith('/v3/scheduling/sessions', {
+      method: 'POST',
+      body: { configuration_id: 'cfg-1', time_to_live_in_minutes: SESSION_TTL_MINUTES },
+    });
+  });
+
+  it('keeps the session short-lived', () => {
+    // A session is the capability to see availability and to book, so it should not outlive the
+    // page view that needs it.
+    expect(SESSION_TTL_MINUTES).toBeLessThanOrEqual(60);
+  });
+
+  it('throws rather than returning undefined when Nylas sends no session id', async () => {
+    // Returning undefined would surface much later as an unauthenticated availability call, which
+    // now 404s in a way that looks like a missing configuration rather than a missing session.
+    nylasRequest.mockResolvedValueOnce({});
+    await expect(createSession('cfg-1')).rejects.toThrow(/no session_id/);
+  });
+});
