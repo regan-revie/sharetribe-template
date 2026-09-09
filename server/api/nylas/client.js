@@ -89,4 +89,41 @@ const exchangeCodeForGrant = async ({ code, redirectUri }) => {
   return { grantId, email: payload.email, provider: payload.provider };
 };
 
-module.exports = { buildAuthUrl, exchangeCodeForGrant, API_KEY_CODE_VERIFIER };
+/**
+ * Authenticated request to the Nylas API, returning the unwrapped `data` payload.
+ *
+ * Every Nylas response wraps its result in `{ request_id, data }`; callers only ever want `data`,
+ * so unwrap it here rather than at every call site.
+ *
+ * @param {string} path e.g. '/v3/grants/abc/calendars'
+ * @param {object} [options]
+ * @param {string} [options.method] defaults to GET
+ * @param {object} [options.body] JSON-serialised when present
+ * @returns {Promise<any>} the `data` field of the response
+ */
+const nylasRequest = async (path, { method = 'GET', body } = {}) => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    // Deliberately does not include the response body: Nylas error payloads can echo request
+    // fields, and these requests are authenticated with the API key.
+    const err = new Error(`Nylas ${method} ${path} failed with status ${response.status}`);
+    err.status = response.status;
+    err.nylasError = payload && (payload.error || (payload.data && payload.data.error));
+    throw err;
+  }
+
+  return payload.data;
+};
+
+module.exports = { buildAuthUrl, exchangeCodeForGrant, nylasRequest, API_KEY_CODE_VERIFIER };
