@@ -150,14 +150,24 @@ Also currently incomplete: `REACT_APP_STRIPE_PUBLISHABLE_KEY` and `REACT_APP_MAP
 Not in scope yet, but worth keeping the architecture compatible: Regan wants discount codes, and there's an existing Stripe integration via Sharetribe. The planned approach (confirmed against Sharetribe's own docs, which use "validating a discount code" as their canonical example for privileged transitions): client submits a code with the booking request → the trusted backend (the same one built for the calendar integration) validates it against a small store of valid codes → backend calls a privileged transition (`privileged-set-line-items`) to recompute Sharetribe's line items with a discount line item → Sharetribe charges the discounted total through its existing Stripe Connect flow, unchanged. No need to touch Stripe's own Coupon/PromotionCode objects. When this project starts, it should mostly be "one more privileged transition + a table of codes" on top of the backend this project builds — don't build the calendar backend in a way that makes that harder later.
 
 ## Next session — start here
-Everything is committed and pushed to `origin/main`, working tree clean. The Render dev service, the webhook receiver and the coach connect flow are all deployed; see "Current state" above for what has been verified.
+Everything is committed and pushed to `origin/main`, working tree clean. The whole backend of the calendar integration is now built and each piece verified against live services; see "Current state" above for what was proven and how.
 
-**Two things are queued and ready to run:**
+**One loose end before anything works end to end:** `SHARETRIBE_INTEGRATION_CLIENT_ID` and `SHARETRIBE_INTEGRATION_CLIENT_SECRET` still need entering in Render → `revie-dev` → Environment. The slots are declared in `render.yaml` and the values are at `op://Revie Dev/sharetribe_dev_nylas/{client_id,client_secret}`. Neither is a `REACT_APP_` variable, so a restart suffices — no rebuild. Until they are set the webhook acknowledges but does nothing, reporting `no-integration-credentials`.
 
-1. **Register the callback URI in Nylas.** Hosted Authentication → Callback URIs → add `https://revie-dev.onrender.com/api/nylas/callback`. Nylas rejects the flow when `redirect_uri` is not pre-registered, so nothing in the connect flow works until this is done.
-2. **Run the connect flow and watch what the coach actually sees.** Log in to the Render service as a coach, then visit `/api/nylas/connect?provider=google`. This answers the tier question in the open questions below: if `provider=google` goes straight to Google's consent screen, Essentials at $15/month is probably enough and the Pro branding add-ons can be skipped. On Sandbox the consent screen will say Nylas and request the broad default scopes — expected, and irrelevant to what is being tested.
+**The remaining work is the booking UI**, and it is the largest single piece left. Everything behind it exists: grant storage, scheduler configuration sync, the webhook receiver with verified signatures, the booking mapping table, and the transition path. What has never been exercised is the join between them — a real client booking a real slot with money moving — because that needs this UI.
 
-**Then the rest of Phase 2:** Scheduler configuration sync (Revie's event types pushed per coach), the booking UI swap on the listing page, and the Sharetribe transition driven from the webhook. The last needs `sharetribe-flex-integration-sdk` added as a dependency and a durable store for the booking↔transaction mapping.
+Three constraints it must satisfy, none of which were in the original plan and all of which were discovered by checking rather than assuming:
+
+1. **Fixed-duration sessions.** The listing type is `unitType: fixed`, so the form being replaced is `BookingFixedDurationForm`, not the hourly `BookingTimeForm`.
+2. **Price variants.** `priceVariations.enabled` is true in all three environments, so the panel must render `PriceVariantPicker` and pass `priceVariantName` through in `orderData`, or it will charge the wrong price.
+3. **Logged-out visitors.** Live is a public marketplace, so a client can reach a listing page with no session. The UI must prompt sign-in before a booking can start rather than assuming `getTrustedSdk` is available.
+
+The seam to build against is `handleSubmit` in `src/containers/ListingPage/ListingPage.shared.js`: everything downstream only needs `bookingStart`, `bookingEnd` and optionally `seats` and `priceVariantName`, so a Nylas-driven form that emits the same shape leaves checkout, line items and Stripe untouched. Note both listing layouts mount `OrderPanel` independently — `ListingPageCarousel.js` and `ListingPageCoverPhoto.js` — so both need changing.
+
+**Two known unknowns to settle while building it:**
+- **The `customFields` shape.** `bookingSync.js` accepts all three forms Nylas's own docs and forum posts disagree about. The first real booking will show which is actually sent, and the extractor can then be narrowed.
+- **Reschedules.** `booking.rescheduled` is currently recorded but not acted on, because Sharetribe booking times cannot be changed in place. Decide whether a reschedule cancels and recreates the transaction, or is handled some other way.
+
 
 ## Phased plan
 1. ~~**Foundation**~~ — **done.** The stock web-template runs locally against the `revie_dev` environment; see "Current state" above.
