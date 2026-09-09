@@ -84,3 +84,10 @@ services:
         sync: false
       - key: REACT_APP_STRIPE_PUBLISHABLE_KEY
         sync: false
+      # Google SSO. REACT_APP_GOOGLE_CLIENT_ID is baked into the bundle at build time and also gates
+      # whether the Google button renders at all (AuthenticationPage.js), so setting it needs a full
+      # redeploy - a restart alone will not make the button appear.
+      - key: REACT_APP_GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
