@@ -198,15 +198,58 @@ describe('scheduling settings', () => {
 describe('cancellation notice', () => {
   const { SCHEDULING_DEFAULTS } = require('./scheduler');
 
-  it('applies the global free-cancellation threshold, not a per-coach one', () => {
+  it('holds the free-cancellation threshold as platform policy, not a per-coach setting', () => {
+    // 48 hours. This is a refund boundary applied by isFreeCancellation(), not something pushed to
+    // Nylas as a barrier - see the min_cancellation_notice assertion below.
+    expect(SCHEDULING_DEFAULTS.freeCancellationMinutes).toBe(48 * 60);
+  });
+});
+
+describe('isFreeCancellation()', () => {
+  const { isFreeCancellation } = require('./scheduler');
+  const START = '2026-06-01T12:00:00Z';
+  const hoursBefore = h => new Date(Date.parse(START) - h * 3600000).toISOString();
+
+  it('refunds a cancellation comfortably outside the window', () => {
+    expect(isFreeCancellation({ bookingStart: START, cancelledAt: hoursBefore(72) })).toBe(true);
+  });
+
+  it('charges a cancellation inside the window', () => {
+    expect(isFreeCancellation({ bookingStart: START, cancelledAt: hoursBefore(47) })).toBe(false);
+    expect(isFreeCancellation({ bookingStart: START, cancelledAt: hoursBefore(1) })).toBe(false);
+  });
+
+  it('treats exactly 48 hours as free', () => {
+    // The generous side of an off-by-one on someone's money is the defensible one.
+    expect(isFreeCancellation({ bookingStart: START, cancelledAt: hoursBefore(48) })).toBe(true);
+  });
+
+  it('charges a cancellation after the session was due to start', () => {
+    expect(isFreeCancellation({ bookingStart: START, cancelledAt: hoursBefore(-2) })).toBe(false);
+  });
+
+  it('accepts Date objects and epoch milliseconds as well as ISO strings', () => {
+    expect(
+      isFreeCancellation({
+        bookingStart: new Date(START),
+        cancelledAt: Date.parse(hoursBefore(72)),
+      })
+    ).toBe(true);
+  });
+
+  it('throws rather than guessing when a time is missing or unparseable', () => {
+    // Silently defaulting either way is a billing dispute nobody notices.
+    expect(() => isFreeCancellation({ bookingStart: START })).toThrow(/valid bookingStart/);
+    expect(() => isFreeCancellation({ bookingStart: 'nonsense', cancelledAt: START })).toThrow();
+  });
+
+  it('no longer blocks late cancellation in Nylas', () => {
     const body = buildConfigurationBody({
       eventType: { title: 'T', description: 'd', durationMinutes: 60 },
       coachName: 'C',
       coachEmail: 'c@e.com',
       calendarId: 'c@e.com',
-      minBookingNoticeMinutes: 72 * 60,
     });
-    expect(body.scheduler.min_cancellation_notice).toBe(48 * 60);
-    expect(SCHEDULING_DEFAULTS.freeCancellationMinutes).toBe(2880);
+    expect(body.scheduler.min_cancellation_notice).toBe(0);
   });
 });

@@ -113,8 +113,11 @@ const buildConfigurationBody = ({
     // The coach's notice period - "no bookings within the next N hours". 72 hours is 4320.
     min_booking_notice: resolveMinBookingNotice(minBookingNoticeMinutes),
     available_days_in_future: clampBookingWindow(availableDaysInFuture),
-    // Global platform policy, not a coach setting.
-    min_cancellation_notice: SCHEDULING_DEFAULTS.freeCancellationMinutes,
+    // Deliberately 0: a client may always cancel, so the coach's calendar frees up and they know
+    // not to expect anyone. Whether the client is *refunded* is decided by isFreeCancellation()
+    // below and enforced by which Sharetribe transition the webhook handler calls - not by blocking
+    // Nylas's cancel button, which would leave the coach expecting a client who is not coming.
+    min_cancellation_notice: 0,
   },
   event_booking: {
     title: eventType.title,
@@ -170,7 +173,34 @@ const syncConfiguration = async ({
   return { configuration: created, created: true };
 };
 
+/**
+ * Does a cancellation fall inside the free-cancellation window?
+ *
+ * This decides money, so it refuses to guess: unparseable or missing times throw rather than
+ * defaulting one way. A webhook that throws is retried and surfaced; a webhook that silently picks
+ * a refund policy is a billing dispute nobody notices.
+ *
+ * The boundary is inclusive — cancelling at exactly 48 hours is free — because the generous side of
+ * an off-by-one on someone's money is the defensible one.
+ *
+ * @param {Date|string|number} bookingStart when the session was due to start
+ * @param {Date|string|number} cancelledAt when the client cancelled
+ * @returns {boolean} true when the client should be refunded
+ */
+const isFreeCancellation = ({ bookingStart, cancelledAt }) => {
+  const start = new Date(bookingStart).getTime();
+  const cancelled = new Date(cancelledAt).getTime();
+
+  if (!Number.isFinite(start) || !Number.isFinite(cancelled)) {
+    throw new Error('isFreeCancellation needs a valid bookingStart and cancelledAt');
+  }
+
+  const noticeMinutes = (start - cancelled) / 60000;
+  return noticeMinutes >= SCHEDULING_DEFAULTS.freeCancellationMinutes;
+};
+
 module.exports = {
+  isFreeCancellation,
   EVENT_TYPES,
   SCHEDULING_DEFAULTS,
   STRIPE_MAX_BOOKING_DAYS,
