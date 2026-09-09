@@ -21,6 +21,40 @@ const EVENT_TYPES = {
   },
 };
 
+/**
+ * Revie-wide scheduling defaults. Coaches can override the notice period per coach; the rest are
+ * platform policy.
+ */
+const SCHEDULING_DEFAULTS = {
+  // How far ahead a client must book, in minutes. Nylas's own default is 60, which is far too
+  // little for a coaching session someone has to prepare for.
+  minBookingNoticeMinutes: 24 * 60,
+  // How far into the future the calendar is bookable, in days. Capped below at
+  // STRIPE_MAX_BOOKING_DAYS.
+  availableDaysInFuture: 30,
+};
+
+/**
+ * Stripe will not hold a card authorisation indefinitely, and the template caps bookings at 90 days
+ * for exactly this reason (see dayCountAvailableForBooking in src/config/configStripe.js). Letting a
+ * coach open their calendar further would create bookings whose payment authorisation expires before
+ * the session happens, so the value is clamped rather than trusted.
+ */
+const STRIPE_MAX_BOOKING_DAYS = 90;
+
+const clampBookingWindow = days => {
+  const n = Number(days);
+  // Checked with Number.isFinite rather than a falsy test: 0 is falsy, so `n || default` would
+  // silently hand a coach the default window instead of clamping their zero to the minimum.
+  if (!Number.isFinite(n)) return SCHEDULING_DEFAULTS.availableDaysInFuture;
+  return Math.max(1, Math.min(Math.round(n), STRIPE_MAX_BOOKING_DAYS));
+};
+
+const resolveMinBookingNotice = minutes => {
+  const n = Number(minutes);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : SCHEDULING_DEFAULTS.minBookingNoticeMinutes;
+};
+
 const getEventType = key => EVENT_TYPES[key];
 
 /** List the calendars on a grant. Requires the calendar.readonly scope. */
@@ -42,7 +76,14 @@ const defaultCalendarFor = calendars => {
 const listConfigurations = grantId =>
   nylasRequest(`/v3/grants/${grantId}/scheduling/configurations`);
 
-const buildConfigurationBody = ({ eventType, coachName, coachEmail, calendarId }) => ({
+const buildConfigurationBody = ({
+  eventType,
+  coachName,
+  coachEmail,
+  calendarId,
+  minBookingNoticeMinutes,
+  availableDaysInFuture,
+}) => ({
   // Public configuration: a client booking a coaching session is not authenticated against Nylas,
   // only against Sharetribe. Session auth would require minting a Nylas session per booker.
   requires_session_auth: false,
@@ -59,6 +100,11 @@ const buildConfigurationBody = ({ eventType, coachName, coachEmail, calendarId }
   availability: {
     duration_minutes: eventType.durationMinutes,
   },
+  scheduler: {
+    // The coach's notice period - "no bookings within the next N hours". 72 hours is 4320.
+    min_booking_notice: resolveMinBookingNotice(minBookingNoticeMinutes),
+    available_days_in_future: clampBookingWindow(availableDaysInFuture),
+  },
   event_booking: {
     title: eventType.title,
     description: eventType.description,
@@ -71,13 +117,28 @@ const buildConfigurationBody = ({ eventType, coachName, coachEmail, calendarId }
  * Idempotent by title: if a configuration for this event type already exists it is updated rather
  * than duplicated, so a coach re-opting-in does not end up selling the same session twice.
  */
-const syncConfiguration = async ({ grantId, eventTypeKey, coachName, coachEmail, calendarId }) => {
+const syncConfiguration = async ({
+  grantId,
+  eventTypeKey,
+  coachName,
+  coachEmail,
+  calendarId,
+  minBookingNoticeMinutes,
+  availableDaysInFuture,
+}) => {
   const eventType = getEventType(eventTypeKey);
   if (!eventType) {
     throw new Error(`Unknown Revie event type: ${eventTypeKey}`);
   }
 
-  const body = buildConfigurationBody({ eventType, coachName, coachEmail, calendarId });
+  const body = buildConfigurationBody({
+    eventType,
+    coachName,
+    coachEmail,
+    calendarId,
+    minBookingNoticeMinutes,
+    availableDaysInFuture,
+  });
   const existing = await listConfigurations(grantId);
   const match = (existing || []).find(
     c => c.event_booking && c.event_booking.title === eventType.title
@@ -100,6 +161,10 @@ const syncConfiguration = async ({ grantId, eventTypeKey, coachName, coachEmail,
 
 module.exports = {
   EVENT_TYPES,
+  SCHEDULING_DEFAULTS,
+  STRIPE_MAX_BOOKING_DAYS,
+  clampBookingWindow,
+  resolveMinBookingNotice,
   getEventType,
   listCalendars,
   listConfigurations,

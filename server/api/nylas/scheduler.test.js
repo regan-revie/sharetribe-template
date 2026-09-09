@@ -151,3 +151,46 @@ describe('syncConfiguration()', () => {
     expect(created).toBe(true);
   });
 });
+
+describe('scheduling settings', () => {
+  const {
+    SCHEDULING_DEFAULTS,
+    STRIPE_MAX_BOOKING_DAYS,
+    clampBookingWindow,
+    resolveMinBookingNotice,
+  } = require('./scheduler');
+
+  it('converts a coach notice period into the minutes Nylas expects', () => {
+    expect(resolveMinBookingNotice(72 * 60)).toBe(4320);
+    expect(resolveMinBookingNotice(0)).toBe(0);
+  });
+
+  it('falls back to the Revie default when a coach has set nothing', () => {
+    // Nylas's own default is 60 minutes, far too little for a session someone must prepare for.
+    expect(resolveMinBookingNotice(undefined)).toBe(SCHEDULING_DEFAULTS.minBookingNoticeMinutes);
+    expect(resolveMinBookingNotice('nonsense')).toBe(SCHEDULING_DEFAULTS.minBookingNoticeMinutes);
+    expect(resolveMinBookingNotice(-5)).toBe(SCHEDULING_DEFAULTS.minBookingNoticeMinutes);
+  });
+
+  it('never lets the booking window exceed the Stripe authorisation limit', () => {
+    // A booking further out than Stripe will hold the card authorisation would have its payment
+    // expire before the session happened.
+    expect(clampBookingWindow(365)).toBe(STRIPE_MAX_BOOKING_DAYS);
+    expect(clampBookingWindow(45)).toBe(45);
+    expect(clampBookingWindow(0)).toBe(1);
+    expect(clampBookingWindow(undefined)).toBe(SCHEDULING_DEFAULTS.availableDaysInFuture);
+  });
+
+  it('puts both settings in the scheduler block Nylas reads', () => {
+    const body = buildConfigurationBody({
+      eventType: { title: 'T', description: 'd', durationMinutes: 60 },
+      coachName: 'C',
+      coachEmail: 'c@e.com',
+      calendarId: 'c@e.com',
+      minBookingNoticeMinutes: 72 * 60,
+      availableDaysInFuture: 120,
+    });
+    expect(body.scheduler.min_booking_notice).toBe(4320);
+    expect(body.scheduler.available_days_in_future).toBe(90);
+  });
+});
