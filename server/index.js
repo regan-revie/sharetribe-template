@@ -36,6 +36,7 @@ const passport = require('passport');
 
 const auth = require('./auth');
 const apiRouter = require('./apiRouter');
+const nylasDb = require('./api/nylas/db');
 const wellKnownRouter = require('./wellKnownRouter');
 const webmanifestResourceRoute = require('./resources/webmanifest');
 const robotsTxtRoute = require('./resources/robotsTxt');
@@ -357,6 +358,16 @@ const server = app.listen(PORT, () => {
   if (dev) {
     console.log(`Open http://localhost:${PORT}/ and start hacking!\n`); // eslint-disable-line no-console
   }
+
+  // Ensure the Nylas booking mapping table exists. Idempotent, and deliberately not awaited: a
+  // database problem must not stop the marketplace itself from serving. It logs loudly instead,
+  // and the webhook handler refuses to process bookings it cannot record.
+  nylasDb
+    .initSchema()
+    .then(ready => {
+      if (ready) console.log('[nylas-db] booking mapping table ready'); // eslint-disable-line no-console
+    })
+    .catch(e => console.error('[nylas-db] schema init failed:', e.message));
 });
 
 // Graceful shutdown:
