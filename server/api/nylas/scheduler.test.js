@@ -78,10 +78,11 @@ describe('buildConfigurationBody()', () => {
     expect(body.event_booking.title).toBe('Signature Session');
   });
 
-  it('creates a public configuration', () => {
-    // Clients booking a session authenticate against Sharetribe, not Nylas; requiring session auth
-    // would mean minting a Nylas session per booker.
-    expect(body.requires_session_auth).toBe(false);
+  it('creates a PRIVATE configuration, so nobody can book without going through us', () => {
+    // A public configuration is publicly bookable: Nylas hosts a page at book.nylas.com/<slug>
+    // and the bookings endpoint accepts unauthenticated requests, so anyone with the id could book
+    // a session for free.
+    expect(body.requires_session_auth).toBe(true);
   });
 });
 

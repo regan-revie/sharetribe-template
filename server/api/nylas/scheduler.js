@@ -93,9 +93,18 @@ const buildConfigurationBody = ({
   minBookingNoticeMinutes,
   availableDaysInFuture,
 }) => ({
-  // Public configuration: a client booking a coaching session is not authenticated against Nylas,
-  // only against Sharetribe. Session auth would require minting a Nylas session per booker.
-  requires_session_auth: false,
+  // Private configuration. This is a security control, not a preference.
+  //
+  // With requires_session_auth false, Nylas hosts a public booking page at book.nylas.com/<slug>
+  // and POST /v3/scheduling/bookings accepts unauthenticated requests - verified, it returns 400 on
+  // a bad body rather than 401. Anyone holding a configuration id or slug could therefore book a
+  // coaching session for free, bypassing Sharetribe and payment entirely: the coach's calendar
+  // would fill up and no money would move.
+  //
+  // Private instead means availability and booking both require a session id minted through
+  // POST /v3/scheduling/sessions, which needs our API key. Our server creates one only once
+  // Sharetribe has taken payment, so a booking cannot exist without a paid transaction behind it.
+  requires_session_auth: true,
   participants: [
     {
       name: coachName,
