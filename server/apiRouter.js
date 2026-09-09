@@ -20,6 +20,7 @@ const nylasWebhooks = require('./api/nylas/webhooks');
 const nylasConnect = require('./api/nylas/connect');
 const nylasCallback = require('./api/nylas/callback');
 const nylasAvailability = require('./api/nylas/availabilityEndpoint');
+const nylasEnableListing = require('./api/nylas/enableListing');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -86,6 +87,11 @@ router.get('/nylas/callback', nylasCallback);
 // Slots for the booking form. Proxied rather than called from the browser so the notice-period
 // filter cannot be edited away client-side, and because minting a Scheduler session needs the API key.
 router.get('/nylas/availability', nylasAvailability);
+
+// A coach opting a listing into calendar booking: pushes their Scheduler configuration and
+// records it on the listing. Uses the Transit body parser above, like the other client-called
+// endpoints, since it is called from the app rather than by Nylas.
+router.post('/nylas/enable-listing', nylasEnableListing);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed
