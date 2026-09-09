@@ -194,3 +194,19 @@ describe('scheduling settings', () => {
     expect(body.scheduler.available_days_in_future).toBe(90);
   });
 });
+
+describe('cancellation notice', () => {
+  const { SCHEDULING_DEFAULTS } = require('./scheduler');
+
+  it('applies a global 24 hour cancellation notice, not a per-coach one', () => {
+    const body = buildConfigurationBody({
+      eventType: { title: 'T', description: 'd', durationMinutes: 60 },
+      coachName: 'C',
+      coachEmail: 'c@e.com',
+      calendarId: 'c@e.com',
+      minBookingNoticeMinutes: 72 * 60,
+    });
+    expect(body.scheduler.min_cancellation_notice).toBe(24 * 60);
+    expect(SCHEDULING_DEFAULTS.minCancellationNoticeMinutes).toBe(1440);
+  });
+});
