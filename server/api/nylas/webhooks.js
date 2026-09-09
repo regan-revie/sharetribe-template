@@ -15,6 +15,7 @@
  */
 
 const { verifySignature, SIGNATURE_HEADER } = require('./signature');
+const { handleBookingWebhook } = require('./bookingSync');
 const { WEBHOOK_SECRET, canVerifyWebhooks } = require('./config');
 
 // Scheduler booking triggers we expect to act on. Anything else is acknowledged and ignored, so an
@@ -100,12 +101,19 @@ const receive = (req, res) => {
     `[nylas] ${trigger} booking=${bookingId || 'unknown'} customFields=${hasCustomFields}`
   );
 
-  // TODO (plan step 8): persist the Nylas booking id to Sharetribe transaction id mapping, then
-  // call the privileged transition through the Integration SDK. Both are deliberately absent here:
-  // sharetribe-flex-integration-sdk is not yet a dependency, and the mapping needs a durable store.
-  // When that lands, acknowledge before doing the work so slow processing cannot cause a timeout.
-
-  res.status(200).json({ received: true, handled: true });
+  // Returned so tests can await completion; Express ignores a handler's return value.
+  return handleBookingWebhook({ trigger, data, grantId: body.data?.grant_id ?? data.grant_id })
+    .then(result => {
+      console.log(`[nylas] ${trigger} -> ${result.action || result.reason}`);
+      res.status(200).json({ received: true, ...result });
+    })
+    .catch(e => {
+      // A 500 makes Nylas retry, which is what we want: the alternative is silently dropping a
+      // booking whose payment has already been taken. Redelivery is safe because Sharetribe rejects
+      // a transition from a state the transaction has already left.
+      console.error(`[nylas] ${trigger} failed for booking ${bookingId}: ${e.message}`);
+      res.status(500).json({ received: true, handled: false, error: 'processing failed' });
+    });
 };
 
 module.exports = { challenge, receive, HANDLED_TRIGGERS };

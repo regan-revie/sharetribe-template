@@ -95,6 +95,14 @@ services:
       # Supplied by Render from the database below - not entered by hand. Holds the Nylas booking
       # to Sharetribe transaction mapping; see server/api/nylas/db.js for why that mapping cannot
       # live in either system on its own.
+      # Integration API credentials - a SEPARATE Sharetribe Console application from the
+      # Marketplace API one. Needed because a Nylas webhook has no logged-in user, so getTrustedSdk
+      # cannot be used to confirm a booking. Create under Build -> Applications -> Integration API.
+      - key: SHARETRIBE_INTEGRATION_CLIENT_ID
+        sync: false
+      - key: SHARETRIBE_INTEGRATION_CLIENT_SECRET
+        sync: false
+
       - key: DATABASE_URL
         fromDatabase:
           name: revie-dev-db

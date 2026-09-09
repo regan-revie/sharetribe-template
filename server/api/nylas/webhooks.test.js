@@ -141,42 +141,55 @@ describe('receive()', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('accepts and handles a correctly signed booking notification', () => {
+  it('accepts a correctly signed booking notification', async () => {
     const { receive } = loadWebhooks(SECRET);
     const res = mockRes();
-    receive(signedRequest(booking, SECRET), res);
+    await receive(signedRequest(booking, SECRET), res);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ received: true, handled: true });
+    expect(res.body).toMatchObject({ received: true });
+  });
+
+  it('acknowledges rather than erroring when it cannot act on a valid webhook', async () => {
+    // With no database configured the booking cannot be recorded, but the request was genuine, so
+    // a 200 with a reason is right - a 500 would make Nylas retry something that cannot succeed.
+    const { receive } = loadWebhooks(SECRET);
+    const res = mockRes();
+    await receive(signedRequest(booking, SECRET), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.handled).toBe(false);
+    expect(res.body.reason).toBe('no-database');
   });
 
   it.each(['booking.pending', 'booking.rescheduled', 'booking.cancelled'])(
-    'handles the %s trigger',
-    type => {
+    'accepts the %s trigger',
+    async type => {
       const { receive } = loadWebhooks(SECRET);
       const res = mockRes();
-      receive(signedRequest({ ...booking, type }, SECRET), res);
+      await receive(signedRequest({ ...booking, type }, SECRET), res);
 
-      expect(res.body).toEqual({ received: true, handled: true });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toMatchObject({ received: true });
     }
   );
 
-  it('acknowledges but does not handle an unrecognised trigger', () => {
+  it('acknowledges but does not handle an unrecognised trigger', async () => {
     const { receive } = loadWebhooks(SECRET);
     const res = mockRes();
-    receive(signedRequest({ type: 'message.created', data: {} }, SECRET), res);
+    await receive(signedRequest({ type: 'message.created', data: {} }, SECRET), res);
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ received: true, handled: false });
   });
 
-  it('does not log participant details from the payload', () => {
+  it('does not log participant details from the payload', async () => {
     const { receive } = loadWebhooks(SECRET);
     const withPii = {
       type: 'booking.created',
       data: { object: { booking_id: 'bk_9', guest: { email: 'coach@example.com' } } },
     };
-    receive(signedRequest(withPii, SECRET), mockRes());
+    await receive(signedRequest(withPii, SECRET), mockRes());
 
     const logged = console.log.mock.calls.flat().join(' ');
     expect(logged).toContain('bk_9');
