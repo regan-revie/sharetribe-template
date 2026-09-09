@@ -19,6 +19,7 @@ const deleteAccount = require('./api/delete-account');
 const nylasWebhooks = require('./api/nylas/webhooks');
 const nylasConnect = require('./api/nylas/connect');
 const nylasCallback = require('./api/nylas/callback');
+const nylasAvailability = require('./api/nylas/availabilityEndpoint');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -81,6 +82,10 @@ router.post('/nylas/webhooks', nylasRawJson, nylasWebhooks.receive);
 // Callback URI on the Nylas application.
 router.get('/nylas/connect', nylasConnect);
 router.get('/nylas/callback', nylasCallback);
+
+// Slots for the booking form. Proxied rather than called from the browser so the notice-period
+// filter cannot be edited away client-side, and because minting a Scheduler session needs the API key.
+router.get('/nylas/availability', nylasAvailability);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed
