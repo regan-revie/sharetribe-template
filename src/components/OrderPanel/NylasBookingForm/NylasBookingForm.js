@@ -8,6 +8,7 @@ import { nylasAvailability } from '../../../util/api';
 
 import { Form, H6, PrimaryButton } from '../../../components';
 import { DatePicker } from '../../DatePicker/DatePickers';
+import { getISODateString } from '../../DatePicker/DatePickers/DatePicker.helpers';
 
 import EstimatedCustomerBreakdownMaybe from '../EstimatedCustomerBreakdownMaybe';
 import FetchLineItemsError from '../FetchLineItemsError/FetchLineItemsError.js';
@@ -71,13 +72,11 @@ const NylasBookingForm = props => {
 
   const listingIdString = listingId?.uuid || listingId;
 
-  // The calendar renders local dates, so a cell's key comes from its local Y/M/D rather than from
-  // an instant formatted in another zone - formatting local midnight in a zone behind the browser
-  // would roll it to the previous day and block the wrong cells.
-  const localDayKey = date =>
-    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-      date.getDate()
-    ).padStart(2, '0')}`;
+  // getISODateString is the calendar's own key for a cell: local Y/M/D, not an instant formatted in
+  // another zone. Formatting local midnight in a zone behind the browser would roll it to the
+  // previous day and block the wrong cells, so reuse the calendar's convention rather than
+  // reimplementing it and hoping the two agree.
+  const localDayKey = getISODateString;
   const timeZoneNames = useMemo(() => getTimeZoneNames(), []);
 
   useEffect(() => {
@@ -208,7 +207,10 @@ const NylasBookingForm = props => {
                   <DatePicker
                     range={false}
                     showMonthStepper={true}
-                    value={activeDay ? [new Date(`${activeDay.dayKey}T12:00:00`)] : []}
+                    // A Date or null, never an array: for range={false} the calendar ignores
+                    // anything else, and the selection then cannot move off the first day.
+                    // Midday avoids a midnight value landing on the previous day.
+                    value={activeDay ? new Date(`${activeDay.dayKey}T12:00:00`) : null}
                     // A day with no slots is not selectable, so the shape of a coach's availability
                     // is visible at a glance rather than discovered by clicking through empty days.
                     isDayBlocked={day => !availableDayKeys.has(localDayKey(day))}

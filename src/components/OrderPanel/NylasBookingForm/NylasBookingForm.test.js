@@ -138,3 +138,36 @@ describe('NylasBookingForm', () => {
     expect(screen.queryByText('15:30')).not.toBeInTheDocument();
   });
 });
+
+describe('the calendar', () => {
+  // Regression: the calendar was given `value` as an array. For range={false} it accepts only a
+  // Date or null, so its internal value never synced and the selection could not move off the
+  // first available day - every other day looked selectable but did nothing.
+  const threeDays = () => {
+    const base = Date.parse('2026-09-14T16:00:00Z');
+    return [0, 1, 2].map(d => {
+      const start = base + d * 86400000;
+      return { start, end: start + 3600000 };
+    });
+  };
+
+  it('leaves every day with availability selectable, not just the first', async () => {
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: threeDays(), connected: true });
+    const { container } = render(<NylasBookingForm {...baseProps} />);
+
+    await waitFor(() => expect(container.querySelector('[aria-disabled="false"]')).toBeTruthy());
+    const selectable = container.querySelectorAll('[aria-disabled="false"]');
+    expect(selectable.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('blocks days with no availability', async () => {
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({ slots: threeDays(), connected: true });
+    const { container } = render(<NylasBookingForm {...baseProps} />);
+
+    await waitFor(() => expect(container.querySelector('[aria-disabled="false"]')).toBeTruthy());
+    // A month has far more days than the three with slots, so most cells must be blocked -
+    // otherwise the client discovers empty days by clicking through them.
+    const blocked = container.querySelectorAll('[aria-disabled="true"]');
+    expect(blocked.length).toBeGreaterThan(20);
+  });
+});
