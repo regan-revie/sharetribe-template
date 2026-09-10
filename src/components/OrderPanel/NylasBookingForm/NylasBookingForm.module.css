@@ -1,0 +1,66 @@
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.heading {
+  margin: 18px 0 6px 0;
+}
+
+.notice,
+.error {
+  margin: 16px 0;
+  color: var(--colorGrey700);
+}
+
+.error {
+  color: var(--colorFail);
+}
+
+/* Days and slots both scroll horizontally rather than wrapping: a coach with a month of
+   availability would otherwise push the submit button far below the fold. */
+.days,
+.slots {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.slots {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.day,
+.slot {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--colorGrey300);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorWhite);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.day:hover,
+.slot:hover {
+  border-color: var(--colorGrey700);
+}
+
+.daySelected,
+.slotSelected {
+  border-color: var(--marketplaceColor);
+  background-color: var(--marketplaceColor);
+  color: var(--colorWhite);
+}
+
+.timeZoneNote {
+  margin: 10px 0 0 0;
+  color: var(--colorGrey500);
+  font-size: 13px;
+}
+
+.submitButton {
+  margin-top: 24px;
+}

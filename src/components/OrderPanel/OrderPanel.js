@@ -54,6 +54,9 @@ const BookingFixedDurationForm = loadable(() =>
     /* webpackChunkName: "BookingFixedDurationForm" */ './BookingFixedDurationForm/BookingFixedDurationForm'
   )
 );
+const NylasBookingForm = loadable(() =>
+  import(/* webpackChunkName: "NylasBookingForm" */ './NylasBookingForm/NylasBookingForm')
+);
 const InquiryWithoutPaymentForm = loadable(() =>
   import(
     /* webpackChunkName: "InquiryWithoutPaymentForm" */ './InquiryWithoutPaymentForm/InquiryWithoutPaymentForm'
@@ -339,8 +342,20 @@ const OrderPanel = props => {
   const isClosed = listing?.attributes?.state === LISTING_STATE_CLOSED;
 
   const shouldHaveFixedBookingDuration = isBooking && [LINE_ITEM_FIXED].includes(lineItemUnitType);
+
+  // Calendar booking replaces the stock availability-plan form for the same listing type, so the
+  // two conditions are mutually exclusive. The flag is written by server/api/nylas/enableListing.js
+  // when a coach opts a listing in; until then the listing falls back to the stock form.
+  const calendarBookingEnabled = !!publicData?.calendarBookingEnabled;
+  const showNylasBookingForm =
+    mounted && shouldHaveFixedBookingDuration && !isClosed && timeZone && calendarBookingEnabled;
   const showBookingFixedDurationForm =
-    mounted && shouldHaveFixedBookingDuration && !isClosed && timeZone && priceVariants?.length > 0;
+    mounted &&
+    shouldHaveFixedBookingDuration &&
+    !isClosed &&
+    timeZone &&
+    priceVariants?.length > 0 &&
+    !calendarBookingEnabled;
 
   const shouldHaveBookingTime = isBooking && [LINE_ITEM_HOUR].includes(lineItemUnitType);
   const showBookingTimeForm = mounted && shouldHaveBookingTime && !isClosed && timeZone;
@@ -490,6 +505,15 @@ const OrderPanel = props => {
           <InvalidCurrency />
         ) : showInvalidPriceVariantsMessage ? (
           <InvalidPriceVariants />
+        ) : showNylasBookingForm ? (
+          <NylasBookingForm
+            className={css.bookingForm}
+            formId="OrderPanelNylasBookingForm"
+            timeZone={timeZone}
+            finePrintComponent={SubmitFinePrint}
+            {...priceVariantsMaybe}
+            {...sharedProps}
+          />
         ) : showBookingFixedDurationForm ? (
           <BookingFixedDurationForm
             seatsEnabled={seatsEnabled}

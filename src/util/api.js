@@ -100,6 +100,29 @@ const post = (path, body, options = {}) => {
   return request(path, requestOptions);
 };
 
+// Bookable slots for a listing, computed from the coach's connected calendar.
+//
+// See server/api/nylas/availabilityEndpoint.js. Proxied through our own server rather than called
+// against Nylas directly, because the coach's notice period is enforced there - a filter applied in
+// the browser would be one devtools edit away from being bypassed.
+//
+// Returns { slots: [{ start, end }], connected } with times in epoch milliseconds. `connected`
+// false means the coach has not linked a calendar yet, which is a normal state rather than an error.
+export const nylasAvailability = ({ listingId, start, end }) => {
+  const params = new URLSearchParams({ listingId });
+  if (start) {
+    params.set('start', start);
+  }
+  if (end) {
+    params.set('end', end);
+  }
+
+  return request(`/api/nylas/availability?${params.toString()}`, {
+    method: methods.GET,
+    headers: { 'Content-Type': 'application/json' },
+  });
+};
+
 // Fetch transaction line items from the local API endpoint.
 //
 // See `server/api/transaction-line-items.js` to see what data should
