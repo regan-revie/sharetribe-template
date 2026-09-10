@@ -46,7 +46,11 @@ const permissiveAvailabilityPlan = timezone => ({
   entries: WEEKDAYS.map(dayOfWeek => ({
     dayOfWeek,
     startTime: '00:00',
-    endTime: '24:00',
+    // End of day is '00:00', not '24:00'. The Marketplace API rejects '24:00' outright with "End
+    // time must be in hh:mm format", and '23:59' with "End time must be a multiple of 5 minutes".
+    // '24:00' is only the template's *internal* representation - see EditListingAvailabilityPanel.js,
+    // which converts it to '00:00' on the way to the API and back again on the way out.
+    endTime: '00:00',
     seats: 1,
   })),
 });

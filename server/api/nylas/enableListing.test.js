@@ -17,7 +17,9 @@ describe('permissiveAvailabilityPlan()', () => {
     expect(new Set(plan.entries.map(e => e.dayOfWeek))).toEqual(new Set(WEEKDAYS));
     plan.entries.forEach(e => {
       expect(e.startTime).toBe('00:00');
-      expect(e.endTime).toBe('24:00');
+      // '00:00' means end of day here. The API rejects '24:00' as a format error and '23:59' as not
+      // a multiple of five minutes; '24:00' is only the template's internal representation.
+      expect(e.endTime).toBe('00:00');
       expect(e.seats).toBe(1);
     });
   });
