@@ -4,7 +4,7 @@
 }
 
 .heading {
-  margin: 18px 0 6px 0;
+  margin: 0 0 8px 0;
 }
 
 .notice,
@@ -17,47 +17,82 @@
   color: var(--colorFail);
 }
 
-/* Days and slots both scroll horizontally rather than wrapping: a coach with a month of
-   availability would otherwise push the submit button far below the fold. */
-.days,
-.slots {
+/* Calendar and times side by side on desktop, stacked on mobile. The order panel is narrow on
+   small screens, so a two-column grid there would squeeze the month grid unreadably. */
+.picker {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+@media (--viewportMedium) {
+  .picker {
+    grid-template-columns: minmax(0, 1fr) 150px;
+  }
+}
+
+.dayColumn {
+  min-width: 0;
+}
+
+.timeColumn {
+  min-width: 0;
+}
+
+/* Capped so a coach with a month of availability cannot push the submit button off the page; the
+   list scrolls instead. */
+.timeList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
-.slots {
-  flex-wrap: wrap;
-  overflow-x: visible;
-}
-
-.day,
 .slot {
-  flex: 0 0 auto;
-  padding: 8px 12px;
+  width: 100%;
+  padding: 10px 12px;
   border: 1px solid var(--colorGrey300);
   border-radius: var(--borderRadiusMedium);
   background-color: var(--colorWhite);
   cursor: pointer;
-  white-space: nowrap;
+  font-weight: var(--fontWeightMedium);
 }
 
-.day:hover,
 .slot:hover {
   border-color: var(--colorGrey700);
 }
 
-.daySelected,
 .slotSelected {
   border-color: var(--marketplaceColor);
   background-color: var(--marketplaceColor);
   color: var(--colorWhite);
 }
 
-.timeZoneNote {
-  margin: 10px 0 0 0;
+.timeZoneRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.timeZoneLabel {
   color: var(--colorGrey500);
+  font-size: 13px;
+}
+
+.timeZoneSelect {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--colorGrey300);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorWhite);
   font-size: 13px;
 }
 

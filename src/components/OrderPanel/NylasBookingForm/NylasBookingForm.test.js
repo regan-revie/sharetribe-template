@@ -49,16 +49,39 @@ describe('NylasBookingForm', () => {
     );
   });
 
-  it('renders slots in the coach timezone and states which timezone that is', async () => {
-    // 22:30 UTC is 15:30 in Los Angeles. Without the note, a client elsewhere reads it as local
-    // time and turns up at the wrong hour.
+  it('renders slots in the viewer timezone, not the coach timezone', async () => {
+    // The client should never do timezone arithmetic. Expected time is computed in the browser's
+    // own zone so the assertion holds wherever the suite runs, rather than pinning one zone.
+    const start = Date.parse('2026-09-11T22:30:00Z');
+    const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const expected = new Intl.DateTimeFormat('en-GB', {
+      timeZone: viewerZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(start));
+
     jest.spyOn(api, 'nylasAvailability').mockResolvedValue({
-      slots: [slot('2026-09-11T22:30:00Z')],
+      slots: [{ start, end: start + 3600000 }],
       connected: true,
     });
     render(<NylasBookingForm {...baseProps} />);
-    await waitFor(() => expect(screen.getByText('15:30')).toBeInTheDocument());
-    expect(screen.getByText(/America\/Los_Angeles/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument());
+  });
+
+  it('shows which timezone the times are in, and lets the client change it', async () => {
+    // Stated rather than assumed: a client booking while travelling wants their home zone, not
+    // wherever the laptop currently is.
+    const start = Date.parse('2026-09-11T22:30:00Z');
+    jest.spyOn(api, 'nylasAvailability').mockResolvedValue({
+      slots: [{ start, end: start + 3600000 }],
+      connected: true,
+    });
+    render(<NylasBookingForm {...baseProps} />);
+    await waitFor(() => expect(screen.getByText(/Times shown in/i)).toBeInTheDocument());
+
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveValue(Intl.DateTimeFormat().resolvedOptions().timeZone);
   });
 
   it('cannot be submitted until a slot is chosen', async () => {

@@ -6,29 +6,31 @@
  */
 
 /**
- * Group slots into days *as the coach's calendar sees them*.
+ * Group slots into days as seen from a given timezone.
  *
- * The grouping timezone matters more than it looks. A slot at 22:30 UTC is Friday evening in London
- * and Friday afternoon in Los Angeles, so grouping by the viewer's own timezone would show a coach's
- * Friday availability under Saturday for some clients. The listing's timezone comes from the coach's
- * connected calendar, so that is the one to group by.
+ * Callers pass the **viewer's** timezone, not the coach's. An earlier version grouped by the coach's
+ * zone to stop a slot appearing under the wrong day, but that was the wrong way round: a client
+ * choosing a session is picking a slot in their own week, so if a slot falls at 3am Saturday for
+ * them then Saturday is genuinely where it belongs. Making the client do timezone arithmetic to
+ * work out which of their days a "Friday" slot lands on is exactly the confusion to avoid.
  *
  * @param {Array<{start: number, end: number}>} slots epoch milliseconds
- * @param {string} timeZone IANA zone, e.g. 'America/Los_Angeles'
+ * @param {string} timeZone IANA zone the viewer is reading times in
  * @returns {Array<{dayKey: string, slots: Array}>} ordered by day
  */
-export const groupSlotsByDay = (slots, timeZone) => {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
+export const dayKeyOf = (date, timeZone) =>
+  new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  });
+  }).format(new Date(date));
 
+export const groupSlotsByDay = (slots, timeZone) => {
   const byDay = new Map();
   (slots || []).forEach(slot => {
     // en-CA gives YYYY-MM-DD, which sorts lexicographically and so needs no date parsing to order.
-    const dayKey = formatter.format(new Date(slot.start));
+    const dayKey = dayKeyOf(slot.start, timeZone);
     if (!byDay.has(dayKey)) {
       byDay.set(dayKey, []);
     }
@@ -43,7 +45,7 @@ export const groupSlotsByDay = (slots, timeZone) => {
     .sort((a, b) => (a.dayKey < b.dayKey ? -1 : 1));
 };
 
-/** A day heading in the coach's timezone, e.g. "Fri 11 Sep". */
+/** A day heading in the given timezone, e.g. "Fri 11 Sep". */
 export const formatDayLabel = (dayKey, timeZone, locale = 'en-GB') => {
   // Midday avoids the edge where a midnight timestamp lands on the previous day in some zones.
   const date = new Date(`${dayKey}T12:00:00Z`);
@@ -55,7 +57,7 @@ export const formatDayLabel = (dayKey, timeZone, locale = 'en-GB') => {
   }).format(date);
 };
 
-/** A slot's start time in the coach's timezone, e.g. "15:30". */
+/** A slot's start time in the given timezone, e.g. "15:30". */
 export const formatSlotTime = (startMs, timeZone, locale = 'en-GB') =>
   new Intl.DateTimeFormat(locale, {
     timeZone,
