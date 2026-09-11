@@ -90,3 +90,73 @@ describe('createSession()', () => {
     await expect(createSession('cfg-1')).rejects.toThrow(/no session_id/);
   });
 });
+
+describe('filterSlotsByOpenHours()', () => {
+  const { filterSlotsByOpenHours, slotInCoachWeek } = require('./availability');
+  const LA = 'America/Los_Angeles';
+  const LONDON = 'Europe/London';
+  const at = iso => ({ start_time: Math.floor(Date.parse(iso) / 1000) });
+  const nineToFiveWeekdays = { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' };
+
+  it('keeps a slot inside the working day', () => {
+    // 2026-09-14 is a Monday. 17:00Z is 10:00 in Los Angeles.
+    expect(
+      filterSlotsByOpenHours([at('2026-09-14T17:00:00Z')], nineToFiveWeekdays, LA)
+    ).toHaveLength(1);
+  });
+
+  it('drops a slot before the working day starts', () => {
+    // 14:00Z is 07:00 in Los Angeles.
+    expect(
+      filterSlotsByOpenHours([at('2026-09-14T14:00:00Z')], nineToFiveWeekdays, LA)
+    ).toHaveLength(0);
+  });
+
+  it('treats the end of the day as exclusive', () => {
+    // A session starting exactly at 17:00 runs past the end of the working day.
+    expect(
+      filterSlotsByOpenHours([at('2026-09-15T00:00:00Z')], nineToFiveWeekdays, LA)
+    ).toHaveLength(0);
+  });
+
+  it('drops slots on days the coach does not work', () => {
+    // 2026-09-19 is a Saturday.
+    expect(
+      filterSlotsByOpenHours([at('2026-09-19T17:00:00Z')], nineToFiveWeekdays, LA)
+    ).toHaveLength(0);
+  });
+
+  it('stays correct across a daylight saving change without being re-synced', () => {
+    // The whole reason this filter lives here rather than in Nylas's default_open_hours, which
+    // bakes in a fixed UTC window. London leaves BST on 2026-10-25, so 09:00 local is 08:00Z
+    // before and 09:00Z after. Both must be kept, and the hour outside must be dropped.
+    const beforeDst = at('2026-10-20T08:00:00Z'); // Tue, 09:00 BST
+    const afterDst = at('2026-10-27T09:00:00Z'); // Tue, 09:00 GMT
+    expect(filterSlotsByOpenHours([beforeDst, afterDst], nineToFiveWeekdays, LONDON)).toHaveLength(
+      2
+    );
+
+    const tooEarlyAfterDst = at('2026-10-27T08:00:00Z'); // Tue, 08:00 GMT - before opening
+    expect(filterSlotsByOpenHours([tooEarlyAfterDst], nineToFiveWeekdays, LONDON)).toHaveLength(0);
+  });
+
+  it('leaves slots alone when no hours are declared', () => {
+    // A coach who has not set hours should still be bookable, not invisible.
+    const slots = [at('2026-09-19T03:00:00Z')];
+    expect(filterSlotsByOpenHours(slots, undefined, LA)).toHaveLength(1);
+    expect(
+      filterSlotsByOpenHours(slots, { days: [], start: '09:00', end: '17:00' }, LA)
+    ).toHaveLength(1);
+    expect(
+      filterSlotsByOpenHours(slots, { days: [1], start: 'nonsense', end: '17:00' }, LA)
+    ).toHaveLength(1);
+  });
+
+  it('reads the weekday and time from the coach timezone, not UTC', () => {
+    // 2026-09-15T02:00Z is Tuesday in UTC but still Monday evening in Los Angeles.
+    expect(slotInCoachWeek(Date.parse('2026-09-15T02:00:00Z'), LA)).toEqual({
+      weekday: 1,
+      minutes: 19 * 60,
+    });
+  });
+});

@@ -117,6 +117,14 @@ const buildConfigurationBody = ({
   ],
   availability: {
     duration_minutes: eventType.durationMinutes,
+    // Without this Nylas steps hourly from *now*, so slot times are whatever minute the page was
+    // loaded - 15:45 one visit, 09:12 the next. Rounding pins them to the hour.
+    round_to: 60,
+    // Note what is deliberately absent: availability_rules.default_open_hours. Nylas stores the
+    // timezone on it and then computes the window as UTC, so a coach asking for 09:00-17:00 local
+    // is offered at 02:00 their time, and the offset drifts again at every daylight saving change.
+    // Working hours are applied in our own availability endpoint instead - see
+    // filterSlotsByOpenHours in availability.js.
   },
   scheduler: {
     // The coach's notice period - "no bookings within the next N hours". 72 hours is 4320.

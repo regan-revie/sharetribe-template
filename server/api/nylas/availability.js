@@ -108,6 +108,72 @@ const filterSlotsByNotice = (slots, minBookingNoticeMinutes, nowSeconds) => {
   return (slots || []).filter(slot => Number(slot.start_time) >= earliestStart);
 };
 
+/**
+ * Where a slot falls in the coach's own week: weekday 1-7 (Monday first) and minutes past midnight.
+ *
+ * Both are read from the slot's instant *as the coach's timezone sees it*, which is what makes the
+ * whole thing daylight-saving correct without anyone maintaining anything. Intl applies whatever
+ * offset was actually in force on that date, so a slot in October and one in December each get the
+ * right answer.
+ */
+const slotInCoachWeek = (startMs, timeZone) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(startMs));
+
+  const get = type => (parts.find(p => p.type === type) || {}).value;
+  const weekdays = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  // 24:00 appears in some locales for midnight; normalise it so comparisons stay ordered.
+  const hour = Number(get('hour')) % 24;
+
+  return {
+    weekday: weekdays[get('weekday')],
+    minutes: hour * 60 + Number(get('minute')),
+  };
+};
+
+const toMinutes = hhmm => {
+  const [h, m] = String(hhmm)
+    .split(':')
+    .map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+};
+
+/**
+ * Keep only slots inside the coach's declared working hours.
+ *
+ * Deliberately applied here rather than through Nylas's `default_open_hours`, which stores a
+ * timezone and then ignores it, computing the window as UTC - so a coach asking for 09:00-17:00
+ * local would be offered at 02:00 their time, and the offset would drift again at every daylight
+ * saving change. Evaluating each slot against the coach's local week avoids both.
+ *
+ * @param {Array<{start_time: number}>} slots Nylas slots, Unix seconds
+ * @param {{days: number[], start: string, end: string}} [openHours] days are 1-7, Monday first
+ * @param {string} timeZone the coach's IANA zone
+ */
+const filterSlotsByOpenHours = (slots, openHours, timeZone) => {
+  const start = openHours && toMinutes(openHours.start);
+  const end = openHours && toMinutes(openHours.end);
+  const days = openHours && openHours.days;
+
+  // No usable hours means no opinion, rather than silently blocking everything: a coach who has not
+  // declared hours should still be bookable, not invisible.
+  if (start == null || end == null || !Array.isArray(days) || days.length === 0) {
+    return slots || [];
+  }
+
+  return (slots || []).filter(slot => {
+    const { weekday, minutes } = slotInCoachWeek(slot.start_time * 1000, timeZone);
+    if (!days.includes(weekday)) return false;
+    // End is exclusive: a session starting exactly at 17:00 runs past the end of the working day.
+    return minutes >= start && minutes < end;
+  });
+};
+
 /** Reshape a Nylas slot into the milliseconds the booking form and Sharetribe both work in. */
 const toBookableSlot = slot => ({
   start: slot.start_time * 1000,
@@ -116,6 +182,8 @@ const toBookableSlot = slot => ({
 
 module.exports = {
   createSession,
+  filterSlotsByOpenHours,
+  slotInCoachWeek,
   fetchAvailability,
   filterSlotsByNotice,
   toBookableSlot,

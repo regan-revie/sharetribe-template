@@ -76,7 +76,15 @@ module.exports = async (req, res) => {
     // Written alongside the configuration id by the same sync, so the two cannot drift.
     const notice = publicData.nylasMinBookingNoticeMinutes;
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const slots = filterSlotsByNotice(raw, notice, nowSeconds).map(toBookableSlot);
+
+    // The coach's working hours are applied here rather than through Nylas's default_open_hours,
+    // which stores a timezone and then computes the window as UTC. Evaluating each slot against the
+    // coach's own week keeps it correct through daylight saving with nothing to re-sync. The zone
+    // comes from the availability plan, which enableListing.js fills from the connected calendar.
+    const coachTimeZone = response.data.data.attributes.availabilityPlan?.timezone;
+    const withinHours = filterSlotsByOpenHours(raw, publicData.nylasOpenHours, coachTimeZone);
+
+    const slots = filterSlotsByNotice(withinHours, notice, nowSeconds).map(toBookableSlot);
 
     res.status(200).json({ slots, connected: true });
   } catch (e) {
