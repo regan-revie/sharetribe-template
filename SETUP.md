@@ -15,7 +15,7 @@ wait.
 
 | What | Why | Who grants it |
 |---|---|---|
-| **GitHub** access to `regan-revie/sharetribe-template` | the code | Regan owns the repo |
+| **GitHub** access to `regan-revie/revie-dev` | the code | Regan owns the repo |
 | **1Password** access to the **`Revie Dev`** vault | every credential the app needs | Philip / Regan |
 | **Sharetribe Console** | marketplace configuration and the Dev environment | existing Console admin |
 | **Nylas dashboard** | calendar integration | existing Nylas account |
@@ -155,8 +155,8 @@ whatever you can see — every vault — whereas the service account sees one, r
 ```bash
 mkdir -p ~/Documents/GitHub/revie
 cd ~/Documents/GitHub/revie
-git clone https://github.com/regan-revie/sharetribe-template.git
-cd sharetribe-template
+git clone https://github.com/regan-revie/revie-dev.git
+cd revie-dev
 yarn install
 ```
 
@@ -280,7 +280,7 @@ Two things about running the app with Claude:
 
 | Thing | Where | Notes |
 |---|---|---|
-| Code | `github.com/regan-revie/sharetribe-template` | branch `main`; deploys automatically |
+| Code | `github.com/regan-revie/revie-dev` | branch `main`; deploys automatically |
 | Deployed dev site | `revie-dev.onrender.com` | Render, Frankfurt, Starter plan |
 | Database | Render `revie-dev-db` | holds the Nylas booking ↔ Sharetribe transaction mapping |
 | Marketplace config | Sharetribe Console → **Dev** environment | listing types, branding, access control |
