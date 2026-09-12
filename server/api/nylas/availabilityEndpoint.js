@@ -15,6 +15,7 @@ const {
   createSession,
   fetchAvailability,
   filterSlotsByNotice,
+  filterSlotsByOpenHours,
   toBookableSlot,
 } = require('./availability');
 const { isConfigured } = require('./config');
