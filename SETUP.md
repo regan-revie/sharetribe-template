@@ -29,6 +29,12 @@ configuration, not to run it.
 
 ## 2. Install the tools
 
+> **Run these in the Mac Terminal, not VS Code's terminal, and restart VS Code once you are done.**
+> Either works for the install itself, but nvm edits your shell profile, and VS Code inherits its
+> environment when it launches — so tools installed inside VS Code's own terminal may be invisible to
+> VS Code until it restarts. That matters here because Claude's shell runs under VS Code: if
+> `node -v` gives one answer in your terminal and another to Claude, this is why.
+
 **Node.js.** The project needs Node `^22.22.0` or `>=24.0.0`; the team runs **24.20.0**. The easiest
 route is [nvm](https://github.com/nvm-sh/nvm):
 
