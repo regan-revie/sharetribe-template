@@ -119,6 +119,31 @@ op account list      # should list the account, not come back empty
 op vault list        # should include "Revie Dev"
 ```
 
+### Optional, once it starts to grate
+
+The steps above mean 1Password prompts whenever the app has locked, which interrupts work with Claude
+several times a day. If that becomes annoying, give Claude's shell its own credential instead:
+
+1. Create a **service account** at 1Password.com, scoped to **`Revie Dev` only** and **read-only**.
+   Everything Claude does with `op` is reading; write access would let a leaked token silently
+   replace a credential, which is far worse and far harder to notice.
+2. Save the token somewhere **other than `Revie Dev`** — do not store the key inside the lock it
+   opens.
+3. Add this to **`~/.zshenv`** (not `.zshrc`) and `chmod 600 ~/.zshenv`:
+
+```sh
+if [ -n "$CLAUDECODE" ]; then
+  export OP_SERVICE_ACCOUNT_TOKEN="ops_..."
+fi
+```
+
+Claude's shell then never prompts, while your own terminal carries on using the desktop app and your
+personal account. **It has to be `.zshenv`**: Claude's shell is non-interactive, and zsh reads
+`.zshrc` only for interactive shells, so a token placed there silently never arrives.
+
+This narrows access rather than loosening it. The desktop app integration gives Claude's shell
+whatever you can see — every vault — whereas the service account sees one, read-only.
+
 > **`op whoami` is a bad test.** It reports the same failure whether the app is locked, the
 > integration is off, or no account exists. `op account list` is the one that distinguishes them —
 > empty means the CLI genuinely has no account configured.
