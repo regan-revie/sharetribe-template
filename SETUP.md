@@ -66,12 +66,18 @@ If that says "command not found", install it from [brew.sh](https://brew.sh):
 It prints two or three follow-up commands at the very end — **run those**, or `brew` will not be
 found in new terminals.
 
-**3. Yarn** — the project uses Yarn, not npm, and mixing them corrupts the lockfile:
+**3. Yarn** — the project uses Yarn, not npm, and mixing them corrupts the lockfile. Install it with
+Homebrew:
 
 ```bash
-npm install -g yarn
+brew install yarn
 yarn -v          # expect 1.22.x
 ```
+
+> **Not `npm install -g yarn`.** That writes into `/usr/local/lib/node_modules`, which the official
+> Node installer leaves owned by `root`, so it fails with **`EACCES`** — a permissions error. You
+> could work around it with `sudo`, but Homebrew installs into a directory you already own, needs no
+> elevated permissions, and gives the same Yarn 1.22.x the rest of the team runs.
 
 **4. Git** comes with the Xcode command line tools: `xcode-select --install`.
 
