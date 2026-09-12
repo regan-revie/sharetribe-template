@@ -35,29 +35,51 @@ configuration, not to run it.
 > VS Code until it restarts. That matters here because Claude's shell runs under VS Code: if
 > `node -v` gives one answer in your terminal and another to Claude, this is why.
 
-**Node.js.** The project needs Node `^22.22.0` or `>=24.0.0`; the team runs **24.20.0**. The easiest
-route is [nvm](https://github.com/nvm-sh/nvm):
+**1. Node.js.** Download the macOS installer from
+[nodejs.org/en/download](https://nodejs.org/en/download), pick **version 24.x**, and run the
+`.pkg`. Click through it — nothing to configure. Then open a **new** terminal and check:
 
 ```bash
-nvm install 24.20.0
-nvm use 24.20.0
-node -v          # expect v24.20.0
+node -v          # expect v24.x
 ```
 
-**Yarn 1.x** — the project uses Yarn, not npm, and mixing them corrupts the lockfile:
+The project accepts `^22.22.0` or `>=24.0.0` and the team runs 24.20.0, so anything in the 24 line
+is fine.
+
+*Optional:* if you would rather switch between Node versions across projects, use
+[nvm](https://github.com/nvm-sh/nvm#installing-and-updating) instead — but note **nvm is not built
+in and has to be installed first**, following the instructions at that link. `command not found:
+nvm` means that step has not been done. You do not need nvm for this project.
+
+**2. Homebrew**, which the 1Password CLI below is installed with. Check whether you already have it:
+
+```bash
+brew --version
+```
+
+If that says "command not found", install it from [brew.sh](https://brew.sh):
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+It prints two or three follow-up commands at the very end — **run those**, or `brew` will not be
+found in new terminals.
+
+**3. Yarn** — the project uses Yarn, not npm, and mixing them corrupts the lockfile:
 
 ```bash
 npm install -g yarn
 yarn -v          # expect 1.22.x
 ```
 
-**Git** comes with Xcode command line tools: `xcode-select --install`.
+**4. Git** comes with the Xcode command line tools: `xcode-select --install`.
 
-**VS Code** from [code.visualstudio.com](https://code.visualstudio.com). While it is open, press
+**5. VS Code** from [code.visualstudio.com](https://code.visualstudio.com). While it is open, press
 `⌘⇧P` and run **"Shell Command: Install 'code' command in PATH"** — some steps below assume it.
 
-**1Password desktop app** from [1password.com/downloads](https://1password.com/downloads), plus the
-CLI:
+**6. 1Password**: the desktop app from
+[1password.com/downloads](https://1password.com/downloads), plus the CLI:
 
 ```bash
 brew install --cask 1password-cli
