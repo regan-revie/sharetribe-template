@@ -92,10 +92,14 @@ const receive = (req, res) => {
   const data = (body.data && body.data.object) || {};
   const bookingId = data.booking_id || data.id;
 
-  // The Sharetribe transaction id travels in customFields. It is NOT retrievable from the Nylas
-  // booking API afterwards, and is not inherited by the event Nylas creates, so this webhook is
-  // the only place it ever appears. Once persistence exists it must be written here, on arrival.
-  const hasCustomFields = Boolean(data.customFields || data.custom_fields);
+  // The Sharetribe transaction id travels in booking_info.additional_fields - confirmed against
+  // Nylas's mock-payload endpoint and a real delivery; see bookingSync.js's extractTransactionId
+  // for the fallback locations kept for safety. It is NOT retrievable from the Nylas booking API
+  // afterwards, and is not inherited by the event Nylas creates, so this webhook is the only place
+  // it ever appears. Once persistence exists it must be written here, on arrival.
+  const hasCustomFields = Boolean(
+    data.booking_info?.additional_fields || data.customFields || data.custom_fields
+  );
 
   console.log(
     `[nylas] ${trigger} booking=${bookingId || 'unknown'} customFields=${hasCustomFields}`
