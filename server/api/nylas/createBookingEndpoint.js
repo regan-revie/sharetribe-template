@@ -22,12 +22,7 @@ const { createCookieTokenStore, getSdk, handleError } = require('../../api-util/
 const { createBooking } = require('./availability');
 const { isConfigured } = require('./config');
 const { TRANSACTION_FIELD } = require('./bookingSync');
-
-/** Sharetribe's own pattern for reading a relationship out of an `include`d response (see
- * server/api/transition-privileged.js's getListingRelationShip) - relationships only carry a
- * {id, type} reference, and the real resource lives alongside it in `included`. */
-const findIncluded = (included, ref) =>
-  ref ? (included || []).find(i => i.id.uuid === ref.id.uuid && i.type === ref.type) : null;
+const { loadCalendarBookingTransaction } = require('./manageBookingShared');
 
 module.exports = async (req, res) => {
   if (!isConfigured()) {
@@ -45,18 +40,10 @@ module.exports = async (req, res) => {
   const sdk = getSdk(req, res, tokenStore);
 
   try {
-    const [txResponse, userResponse] = await Promise.all([
-      sdk.transactions.show({ id: transactionId, include: ['listing', 'booking'] }),
+    const [{ tx, configurationId, booking }, userResponse] = await Promise.all([
+      loadCalendarBookingTransaction(sdk, transactionId),
       sdk.currentUser.show(),
     ]);
-
-    // sdk.transactions.show already refuses (403) a transaction this caller is not a party to, so
-    // reaching this point proves they are the customer or provider on it. OrderPanel already
-    // refuses to let a provider book their own listing, so in practice this is always the customer.
-    const tx = txResponse.data.data;
-    const included = txResponse.data.included;
-    const listing = findIncluded(included, tx.relationships?.listing?.data);
-    const booking = findIncluded(included, tx.relationships?.booking?.data);
 
     const hasConfirmedPayment = (tx.attributes.transitions || []).some(
       t => t.transition === 'transition/confirm-payment'
@@ -68,10 +55,6 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const publicData = listing?.attributes?.publicData || {};
-    const configurationId = publicData.calendarBookingEnabled
-      ? publicData.nylasConfigurationId
-      : null;
     if (!configurationId) {
       res.status(422).json({ error: 'Listing is not set up for calendar booking' });
       return;

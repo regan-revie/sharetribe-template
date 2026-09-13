@@ -230,6 +230,73 @@ const createBooking = async ({ configurationId, start, end, guest, additionalFie
   return payload.data;
 };
 
+/**
+ * Cancel a Nylas booking against a private configuration.
+ *
+ * Same session mechanics as createBooking: a private configuration only ever accepts a session in
+ * place of the API key. This is what a client's own "Cancel this session" action calls - Nylas's
+ * hosted book.nylas.com cancel link cannot work here at all, because it has no way to mint one.
+ *
+ * @param {object} params
+ * @param {string} params.configurationId
+ * @param {string} params.bookingId the Nylas booking id (not the booking_ref in a hosted link)
+ * @returns {Promise<void>}
+ */
+const cancelBooking = async ({ configurationId, bookingId }) => {
+  const session = await createSession(configurationId);
+
+  const response = await fetch(`${API_BASE_URL}/v3/scheduling/bookings/${bookingId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${session}`, Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    const err = new Error(`Nylas booking cancellation failed with status ${response.status}`);
+    err.status = response.status;
+    throw err;
+  }
+};
+
+/**
+ * Move a Nylas booking to a new time, in place - same booking id, same Sharetribe transaction.
+ *
+ * Decided with Regan: Sharetribe's own booking record cannot be edited once created, so it is left
+ * showing the original time. Our own database becomes the authority on when the session actually
+ * is - see the booking.rescheduled handling in bookingSync.js, which is what keeps it in sync once
+ * this call succeeds and Nylas confirms it with a webhook.
+ *
+ * @param {object} params
+ * @param {string} params.configurationId
+ * @param {string} params.bookingId
+ * @param {Date|number|string} params.start
+ * @param {Date|number|string} params.end
+ * @returns {Promise<object>} the updated booking
+ */
+const rescheduleBooking = async ({ configurationId, bookingId, start, end }) => {
+  const session = await createSession(configurationId);
+
+  const response = await fetch(`${API_BASE_URL}/v3/scheduling/bookings/${bookingId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${session}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ start_time: toUnixSeconds(start), end_time: toUnixSeconds(end) }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const err = new Error(`Nylas booking reschedule failed with status ${response.status}`);
+    err.status = response.status;
+    err.nylasError = payload && payload.error;
+    throw err;
+  }
+
+  return payload.data;
+};
+
 module.exports = {
   createSession,
   filterSlotsByOpenHours,
@@ -238,6 +305,8 @@ module.exports = {
   filterSlotsByNotice,
   toBookableSlot,
   createBooking,
+  cancelBooking,
+  rescheduleBooking,
   toUnixSeconds,
   SESSION_TTL_MINUTES,
 };

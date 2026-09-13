@@ -22,6 +22,9 @@ const nylasCallback = require('./api/nylas/callback');
 const nylasAvailability = require('./api/nylas/availabilityEndpoint');
 const nylasEnableListing = require('./api/nylas/enableListing');
 const nylasCreateBooking = require('./api/nylas/createBookingEndpoint');
+const nylasCancelBooking = require('./api/nylas/cancelBookingEndpoint');
+const nylasRescheduleBooking = require('./api/nylas/rescheduleBookingEndpoint');
+const nylasBookingStatus = require('./api/nylas/bookingStatusEndpoint');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -97,6 +100,15 @@ router.post('/nylas/enable-listing', nylasEnableListing);
 // The call that actually creates the Nylas booking, once a client's payment is confirmed. See
 // server/api/nylas/createBookingEndpoint.js for why this exists at all.
 router.post('/nylas/create-booking', nylasCreateBooking);
+
+// Client-initiated cancel/reschedule, since Nylas's own hosted cancel/reschedule links cannot work
+// against a private Scheduler configuration - see cancelBookingEndpoint.js.
+router.post('/nylas/cancel-booking', nylasCancelBooking);
+router.post('/nylas/reschedule-booking', nylasRescheduleBooking);
+
+// What a client/coach-facing UI should show as the session time - our own database when a
+// reschedule has moved it, since Sharetribe's own booking record cannot be edited in place.
+router.get('/nylas/booking-status', nylasBookingStatus);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed
