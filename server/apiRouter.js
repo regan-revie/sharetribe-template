@@ -21,6 +21,7 @@ const nylasConnect = require('./api/nylas/connect');
 const nylasCallback = require('./api/nylas/callback');
 const nylasAvailability = require('./api/nylas/availabilityEndpoint');
 const nylasEnableListing = require('./api/nylas/enableListing');
+const nylasCreateBooking = require('./api/nylas/createBookingEndpoint');
 
 const createUserWithIdp = require('./api/auth/createUserWithIdp');
 
@@ -92,6 +93,10 @@ router.get('/nylas/availability', nylasAvailability);
 // records it on the listing. Uses the Transit body parser above, like the other client-called
 // endpoints, since it is called from the app rather than by Nylas.
 router.post('/nylas/enable-listing', nylasEnableListing);
+
+// The call that actually creates the Nylas booking, once a client's payment is confirmed. See
+// server/api/nylas/createBookingEndpoint.js for why this exists at all.
+router.post('/nylas/create-booking', nylasCreateBooking);
 
 // Create user with identity provider (e.g. Facebook or Google)
 // This endpoint is called to create a new user after user has confirmed

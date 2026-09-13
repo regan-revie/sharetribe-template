@@ -180,6 +180,56 @@ const toBookableSlot = slot => ({
   end: slot.end_time * 1000,
 });
 
+/**
+ * Create a Nylas booking against a private configuration.
+ *
+ * This is the call nothing else in the codebase was making: availability only ever *reads* a
+ * coach's free/busy time, so without this, a client could pay through Sharetribe and Nylas would
+ * never be told the slot was taken. Mirrors fetchAvailability's session mechanics - a private
+ * configuration is addressed by session alone, and the session id replaces the API key in the
+ * Authorization header.
+ *
+ * @param {object} params
+ * @param {string} params.configurationId
+ * @param {Date|number|string} params.start
+ * @param {Date|number|string} params.end
+ * @param {{name: string, email: string}} params.guest
+ * @param {object} [params.additionalFields] carried through unchanged onto the booking; this is
+ *   where the Sharetribe transaction id goes so the booking.created webhook can find its way back.
+ * @returns {Promise<object>} the created booking, including its id
+ */
+const createBooking = async ({ configurationId, start, end, guest, additionalFields }) => {
+  const session = await createSession(configurationId);
+
+  const response = await fetch(`${API_BASE_URL}/v3/scheduling/bookings`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      start_time: toUnixSeconds(start),
+      end_time: toUnixSeconds(end),
+      guest,
+      ...(additionalFields ? { additional_fields: additionalFields } : {}),
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    // Deliberately does not include the response body: it can echo request fields, and this
+    // request carries the guest's name and email.
+    const err = new Error(`Nylas booking creation failed with status ${response.status}`);
+    err.status = response.status;
+    err.nylasError = payload && payload.error;
+    throw err;
+  }
+
+  return payload.data;
+};
+
 module.exports = {
   createSession,
   filterSlotsByOpenHours,
@@ -187,6 +237,7 @@ module.exports = {
   fetchAvailability,
   filterSlotsByNotice,
   toBookableSlot,
+  createBooking,
   toUnixSeconds,
   SESSION_TTL_MINUTES,
 };

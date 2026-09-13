@@ -123,6 +123,15 @@ export const nylasAvailability = ({ listingId, start, end }) => {
   });
 };
 
+// Tell Nylas a booking happened, once a transaction's payment is confirmed.
+//
+// See server/api/nylas/createBookingEndpoint.js. Without this call nothing ever creates the actual
+// Nylas booking, so the coach's calendar never fills in and the booking.created webhook that
+// confirms the Sharetribe transaction never fires.
+export const nylasCreateBooking = ({ transactionId }) => {
+  return post('/api/nylas/create-booking', { transactionId });
+};
+
 // Fetch transaction line items from the local API endpoint.
 //
 // See `server/api/transaction-line-items.js` to see what data should

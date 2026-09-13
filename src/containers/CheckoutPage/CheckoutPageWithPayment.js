@@ -10,6 +10,7 @@ import {
 import { propTypes } from '../../util/types';
 import { ensureTransaction } from '../../util/data';
 import { createSlug } from '../../util/urlHelpers';
+import { nylasCreateBooking } from '../../util/api';
 import {
   isTransactionInitiateListingNotFoundError,
   isTransactionsTransitionInvalidTransition,
@@ -340,6 +341,19 @@ const handleSubmit = (values, process, props, stripe, submitting, setSubmitting)
     .then(response => {
       const { orderId, paymentMethodSaved } = response;
       setSubmitting(false);
+
+      // Payment is confirmed, but nothing has told Nylas yet - Sharetribe's own checkout only
+      // ever knew about price and payment, never about the coach's calendar. This is the one call
+      // that actually creates the Nylas booking; its booking.created webhook is what runs
+      // transition/operator-accept and moves the transaction on. Fired without blocking navigation:
+      // a slow or failed call here shouldn't stop the client from seeing their confirmation, but a
+      // failure does mean the transaction is stuck until reconciled by hand (see CLAUDE.md's
+      // Phase 3 hardening notes on abandoned bookings).
+      if (pageData?.listing?.attributes?.publicData?.calendarBookingEnabled) {
+        nylasCreateBooking({ transactionId: orderId.uuid }).catch(e => {
+          console.error('[nylas] Could not create the calendar booking:', e);
+        });
+      }
 
       const orderDetailsPath = pathByRouteName('OrderDetailsPage', routeConfiguration, {
         id: orderId.uuid,
