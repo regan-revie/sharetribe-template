@@ -1,0 +1,82 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 8px;
+}
+
+.heading {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.time {
+  font-weight: var(--fontWeightSemiBold);
+  margin-bottom: 16px;
+}
+
+.error {
+  color: var(--colorFail);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cancelLink {
+  color: var(--colorFail);
+}
+
+.confirmCancel {
+  margin-top: 8px;
+}
+
+.reschedule {
+  margin-top: 8px;
+}
+
+.dayTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.dayTab,
+.dayTabActive {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--colorGrey100);
+  background: none;
+  cursor: pointer;
+}
+
+.dayTabActive {
+  border-color: var(--marketplaceColor);
+  color: var(--marketplaceColor);
+  font-weight: var(--fontWeightSemiBold);
+}
+
+.slotList {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.slotButton {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--colorGrey100);
+  background: none;
+  cursor: pointer;
+}
+
+.slotButton:hover:not(:disabled) {
+  border-color: var(--marketplaceColor);
+}

@@ -74,6 +74,7 @@ import RequestChangesModal from './RequestChangesModal/RequestChangesModal';
 import MakeCounterOfferModal from './MakeCounterOfferModal/MakeCounterOfferModal';
 import SendMessageForm from './SendMessageForm/SendMessageForm';
 import TransactionPanel from './TransactionPanel/TransactionPanel';
+import ManageCalendarBooking from './ManageCalendarBooking/ManageCalendarBooking';
 
 import {
   makeTransition,
@@ -804,6 +805,14 @@ export const TransactionPageComponent = props => {
     process?.hasPassedState(process?.states?.ACCEPTED, transaction) &&
     foundListingTypeConfig?.defaultListingFields.location;
 
+  // Cancel/reschedule is customer-only, and only once the booking is actually confirmed
+  // (operator-accept has run) - before that there is nothing on Nylas yet to cancel or move.
+  const showManageCalendarBooking =
+    isCustomerRole &&
+    isBookingProcess(stateData.processName) &&
+    !!listing?.attributes?.publicData?.calendarBookingEnabled &&
+    process?.hasPassedState(process?.states?.ACCEPTED, transaction);
+
   const isNegotiationProcess = processName === NEGOTIATION_PROCESS_NAME;
   const isRegularNegotiation =
     isNegotiationProcess && transaction?.attributes?.protectedData?.unitType === OFFER;
@@ -1038,7 +1047,12 @@ export const TransactionPageComponent = props => {
       scrollingDisabled={scrollingDisabled}
     >
       <LayoutSingleColumn topbar={<TopbarContainer />} footer={<FooterContainer />}>
-        <div className={css.root}>{panel}</div>
+        <div className={css.root}>
+          {panel}
+          {showManageCalendarBooking ? (
+            <ManageCalendarBooking transactionId={transaction?.id} listingId={listing?.id} />
+          ) : null}
+        </div>
         <ReviewModal
           id="ReviewOrderModal"
           isOpen={isReviewModalOpen}

@@ -132,6 +132,27 @@ export const nylasCreateBooking = ({ transactionId }) => {
   return post('/api/nylas/create-booking', { transactionId });
 };
 
+// Client-initiated cancel/reschedule. See server/api/nylas/cancelBookingEndpoint.js for why these
+// exist at all: Nylas's own hosted cancel/reschedule links cannot work against a private Scheduler
+// configuration, so this app has to offer the action itself.
+export const nylasCancelBooking = ({ transactionId }) => {
+  return post('/api/nylas/cancel-booking', { transactionId });
+};
+
+export const nylasRescheduleBooking = ({ transactionId, start, end }) => {
+  return post('/api/nylas/reschedule-booking', { transactionId, start, end });
+};
+
+// The session time to actually display: our own database once a reschedule has moved it,
+// Sharetribe's original booking record otherwise. See bookingStatusEndpoint.js.
+export const nylasBookingStatus = ({ transactionId }) => {
+  const params = new URLSearchParams({ transactionId });
+  return request(`/api/nylas/booking-status?${params.toString()}`, {
+    method: methods.GET,
+    headers: { 'Content-Type': 'application/json' },
+  });
+};
+
 // Fetch transaction line items from the local API endpoint.
 //
 // See `server/api/transaction-line-items.js` to see what data should
