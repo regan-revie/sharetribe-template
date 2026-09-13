@@ -29,6 +29,15 @@ beforeEach(() => {
 });
 
 describe('extractTransactionId()', () => {
+  it('reads the confirmed shape: nested under booking_info', () => {
+    // Confirmed against Nylas's own mock-payload endpoint and a real webhook delivery - the
+    // top-level customFields/custom_fields shapes below were the pre-launch best guess and are
+    // kept only as a fallback.
+    expect(
+      extractTransactionId({ booking_info: { additional_fields: { [TRANSACTION_FIELD]: TX } } })
+    ).toBe(TX);
+  });
+
   it('reads the array-of-pairs shape', () => {
     expect(extractTransactionId({ customFields: [{ name: TRANSACTION_FIELD, value: TX }] })).toBe(
       TX
@@ -51,6 +60,13 @@ describe('extractTransactionId()', () => {
 });
 
 describe('extractBookingStart()', () => {
+  it('reads the confirmed shape: nested under booking_info', () => {
+    const seconds = 1780000000;
+    expect(extractBookingStart({ booking_info: { start_time: seconds } }).getTime()).toBe(
+      seconds * 1000
+    );
+  });
+
   it('treats a number as epoch SECONDS, not milliseconds', () => {
     // Getting this wrong puts the session fifty years out and makes every cancellation look free.
     const seconds = 1780000000;

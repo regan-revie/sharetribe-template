@@ -66,6 +66,17 @@ const resolveMinBookingNotice = minutes => {
 
 const getEventType = key => EVENT_TYPES[key];
 
+/**
+ * The custom field carrying the Sharetribe transaction id through a Nylas booking.
+ *
+ * Nylas rejects an unrecognised `additional_fields` key at booking-creation time with "Additional
+ * field 'x' not found in configuration" - found by trying it, not by reading the docs, which do not
+ * spell out that additional fields must be declared on the configuration before a booking can carry
+ * one. `metadata` is the field type meant for exactly this: data carried through a booking without
+ * being shown to or filled in by the guest, unlike `text`/`email`/etc.
+ */
+const TRANSACTION_FIELD = 'sharetribeTransactionId';
+
 /** List the calendars on a grant. Requires the calendar.readonly scope. */
 const listCalendars = grantId => nylasRequest(`/v3/grants/${grantId}/calendars`);
 
@@ -135,6 +146,15 @@ const buildConfigurationBody = ({
     // below and enforced by which Sharetribe transition the webhook handler calls - not by blocking
     // Nylas's cancel button, which would leave the coach expecting a client who is not coming.
     min_cancellation_notice: 0,
+    // Nested under `scheduler`, not top-level: confirmed by probing the live API, since a
+    // top-level `additional_fields` is accepted with no error and silently dropped.
+    additional_fields: {
+      [TRANSACTION_FIELD]: {
+        label: 'Sharetribe transaction id',
+        type: 'metadata',
+        required: false,
+      },
+    },
   },
   event_booking: {
     title: eventType.title,
@@ -218,6 +238,7 @@ const isFreeCancellation = ({ bookingStart, cancelledAt }) => {
 
 module.exports = {
   isFreeCancellation,
+  TRANSACTION_FIELD,
   EVENT_TYPES,
   SCHEDULING_DEFAULTS,
   STRIPE_MAX_BOOKING_DAYS,
