@@ -190,3 +190,58 @@ describe('booking.cancelled', () => {
     await expect(handleBookingWebhook(cancelled)).rejects.toThrow(/no booking start time/);
   });
 });
+
+describe('booking.rescheduled', () => {
+  const rescheduled = {
+    trigger: 'booking.rescheduled',
+    grantId: 'g1',
+    data: {
+      booking_id: BOOKING,
+      booking_info: { start_time: 1790000000, end_time: 1790003600 },
+    },
+  };
+
+  it('updates the stored time and status, without touching Sharetribe', async () => {
+    db.findByBookingId.mockResolvedValue({
+      sharetribe_transaction_id: TX,
+      nylas_grant_id: 'g1',
+      booking_start: new Date('2026-06-01T12:00:00Z'),
+      booking_end: new Date('2026-06-01T13:00:00Z'),
+    });
+    const result = await handleBookingWebhook(rescheduled);
+    expect(db.recordBooking).toHaveBeenCalledWith({
+      nylasBookingId: BOOKING,
+      sharetribeTransactionId: TX,
+      nylasGrantId: 'g1',
+      bookingStart: new Date(1790000000 * 1000),
+      bookingEnd: new Date(1790003600 * 1000),
+      status: 'rescheduled',
+    });
+    expect(applyTransition).not.toHaveBeenCalled();
+    expect(result).toEqual({ handled: true, action: 'rescheduled' });
+  });
+
+  it('falls back to the previously stored time if the payload carries none', async () => {
+    const existingStart = new Date('2026-06-01T12:00:00Z');
+    const existingEnd = new Date('2026-06-01T13:00:00Z');
+    db.findByBookingId.mockResolvedValue({
+      sharetribe_transaction_id: TX,
+      nylas_grant_id: 'g1',
+      booking_start: existingStart,
+      booking_end: existingEnd,
+    });
+    await handleBookingWebhook({ ...rescheduled, data: { booking_id: BOOKING } });
+    expect(db.recordBooking).toHaveBeenCalledWith(
+      expect.objectContaining({ bookingStart: existingStart, bookingEnd: existingEnd })
+    );
+  });
+
+  it('does nothing for a booking it has never seen', async () => {
+    db.findByBookingId.mockResolvedValue(null);
+    await expect(handleBookingWebhook(rescheduled)).resolves.toEqual({
+      handled: false,
+      reason: 'unknown-booking',
+    });
+    expect(db.recordBooking).not.toHaveBeenCalled();
+  });
+});

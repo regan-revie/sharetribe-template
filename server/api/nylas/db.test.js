@@ -51,6 +51,7 @@ describe('schema', () => {
     await loadDb(URL).initSchema();
     const sql = mockQuery.mock.calls.map(c => c[0]).join('\n');
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS nylas_bookings/);
+    expect(sql).toMatch(/ALTER TABLE nylas_bookings ADD COLUMN IF NOT EXISTS booking_end/);
     expect(sql).toMatch(/CREATE INDEX IF NOT EXISTS nylas_bookings_transaction_idx/);
     // Safe to run on every boot, which is why there is no migration framework.
     expect(sql).not.toMatch(/DROP /);
@@ -66,15 +67,23 @@ describe('recordBooking()', () => {
       sharetribeTransactionId: 'tx_1',
       nylasGrantId: 'grant_1',
       bookingStart: '2026-06-01T12:00:00Z',
+      bookingEnd: '2026-06-01T13:00:00Z',
       status: 'created',
     });
     const [sql, params] = mockQuery.mock.calls[0];
     expect(sql).toMatch(/INSERT INTO nylas_bookings/);
     expect(sql).toMatch(/ON CONFLICT \(nylas_booking_id\) DO UPDATE/);
-    expect(params).toEqual(['bk_1', 'tx_1', 'grant_1', '2026-06-01T12:00:00Z', 'created']);
+    expect(params).toEqual([
+      'bk_1',
+      'tx_1',
+      'grant_1',
+      '2026-06-01T12:00:00Z',
+      '2026-06-01T13:00:00Z',
+      'created',
+    ]);
   });
 
-  it('stores a null booking_start rather than undefined', async () => {
+  it('stores a null booking_start and booking_end rather than undefined', async () => {
     mockQuery.mockResolvedValue({ rows: [{}] });
     await loadDb(URL).recordBooking({
       nylasBookingId: 'bk_2',
@@ -83,6 +92,30 @@ describe('recordBooking()', () => {
       status: 'created',
     });
     expect(mockQuery.mock.calls[0][1][3]).toBeNull();
+    expect(mockQuery.mock.calls[0][1][4]).toBeNull();
+  });
+
+  it('updates booking_start and booking_end on a reschedule, keyed on the same booking id', async () => {
+    // A reschedule upserts the same row rather than inserting a new one - the primary key is the
+    // Nylas booking id, which does not change when only the time does.
+    mockQuery.mockResolvedValue({ rows: [{ nylas_booking_id: 'bk_1' }] });
+    await loadDb(URL).recordBooking({
+      nylasBookingId: 'bk_1',
+      sharetribeTransactionId: 'tx_1',
+      nylasGrantId: 'grant_1',
+      bookingStart: '2026-06-02T12:00:00Z',
+      bookingEnd: '2026-06-02T13:00:00Z',
+      status: 'rescheduled',
+    });
+    const [, params] = mockQuery.mock.calls[0];
+    expect(params).toEqual([
+      'bk_1',
+      'tx_1',
+      'grant_1',
+      '2026-06-02T12:00:00Z',
+      '2026-06-02T13:00:00Z',
+      'rescheduled',
+    ]);
   });
 });
 

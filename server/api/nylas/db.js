@@ -62,6 +62,11 @@ const initSchema = async () => {
       updated_at                timestamptz NOT NULL DEFAULT now()
     )
   `);
+  // Added after the table already existed in a live database - CREATE TABLE IF NOT EXISTS above
+  // does nothing for an existing table, so the column needs its own idempotent statement. Needed
+  // once a reschedule became something this table has to represent: a booking's displayed period
+  // is authoritative here, not on Sharetribe's immutable transaction record, so both ends matter.
+  await query(`ALTER TABLE nylas_bookings ADD COLUMN IF NOT EXISTS booking_end timestamptz`);
   // Both directions are needed: booking id from a webhook, transaction id when reconciling from
   // the Sharetribe side. The primary key covers the first, this covers the second.
   await query(
@@ -82,20 +87,22 @@ const recordBooking = async ({
   sharetribeTransactionId,
   nylasGrantId,
   bookingStart,
+  bookingEnd,
   status,
 }) => {
   const { rows } = await query(
     `INSERT INTO nylas_bookings
-       (nylas_booking_id, sharetribe_transaction_id, nylas_grant_id, booking_start, status)
-     VALUES ($1, $2, $3, $4, $5)
+       (nylas_booking_id, sharetribe_transaction_id, nylas_grant_id, booking_start, booking_end, status)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (nylas_booking_id) DO UPDATE
        SET sharetribe_transaction_id = EXCLUDED.sharetribe_transaction_id,
            nylas_grant_id            = EXCLUDED.nylas_grant_id,
            booking_start             = EXCLUDED.booking_start,
+           booking_end               = EXCLUDED.booking_end,
            status                    = EXCLUDED.status,
            updated_at                = now()
      RETURNING *`,
-    [nylasBookingId, sharetribeTransactionId, nylasGrantId, bookingStart || null, status]
+    [nylasBookingId, sharetribeTransactionId, nylasGrantId, bookingStart || null, bookingEnd || null, status]
   );
   return rows[0];
 };

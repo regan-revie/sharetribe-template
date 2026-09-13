@@ -58,6 +58,16 @@ const extractBookingStart = data => {
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 };
 
+/** Pull the session end time out of a booking payload. Same nesting and epoch-seconds caveat as
+ * extractBookingStart above. */
+const extractBookingEnd = data => {
+  const raw = data?.booking_info?.end_time ?? data?.end_time ?? data?.endTime ?? data?.end;
+  if (raw == null) return null;
+  if (typeof raw === 'number') return new Date(raw * 1000);
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+};
+
 const extractBookingId = data => data?.booking_id ?? data?.bookingId ?? data?.id ?? null;
 
 /**
@@ -87,6 +97,7 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
       sharetribeTransactionId: transactionId,
       nylasGrantId: grantId,
       bookingStart: extractBookingStart(data),
+      bookingEnd: extractBookingEnd(data),
       status: trigger === 'booking.created' ? 'created' : 'pending',
     });
 
@@ -124,10 +135,27 @@ const handleBookingWebhook = async ({ trigger, data, grantId }) => {
   }
 
   if (trigger === 'booking.rescheduled') {
-    // Rescheduling moves the session without touching the money. Sharetribe's booking times cannot
-    // be changed in place, so this needs its own design - recorded for now so nothing is lost.
-    await db.setStatus(bookingId, 'rescheduled');
-    return { handled: true, action: 'recorded-reschedule' };
+    // Rescheduling moves the session without touching the money - no Sharetribe transition, no
+    // refund logic, same transaction throughout. But Sharetribe's own booking record is immutable
+    // once created, so it cannot show the new time: this database row is what does. Decided with
+    // Regan - the client/coach-facing "when is this session" surfaces are meant to read from here,
+    // not from Sharetribe's now-stale record.
+    const mapping = await db.findByBookingId(bookingId);
+    if (!mapping) {
+      // Same reasoning as the no-transaction-id case above: a reschedule notification for a
+      // booking we never recorded did not come from Revie's checkout.
+      return { handled: false, reason: 'unknown-booking' };
+    }
+
+    await db.recordBooking({
+      nylasBookingId: bookingId,
+      sharetribeTransactionId: mapping.sharetribe_transaction_id,
+      nylasGrantId: mapping.nylas_grant_id,
+      bookingStart: extractBookingStart(data) ?? mapping.booking_start,
+      bookingEnd: extractBookingEnd(data) ?? mapping.booking_end,
+      status: 'rescheduled',
+    });
+    return { handled: true, action: 'rescheduled' };
   }
 
   return { handled: false, reason: 'unhandled-trigger' };
@@ -137,6 +165,7 @@ module.exports = {
   TRANSACTION_FIELD,
   extractTransactionId,
   extractBookingStart,
+  extractBookingEnd,
   extractBookingId,
   handleBookingWebhook,
 };
