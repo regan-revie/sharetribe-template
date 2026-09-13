@@ -9,6 +9,7 @@ import { nylasAvailability } from '../../../util/api';
 import { Form, H6, PrimaryButton } from '../../../components';
 import { DatePicker } from '../../DatePicker/DatePickers';
 import { getISODateString } from '../../DatePicker/DatePickers/DatePicker.helpers';
+import { BOOKING_PROCESS_NAME } from '../../../transactions/transaction';
 
 import EstimatedCustomerBreakdownMaybe from '../EstimatedCustomerBreakdownMaybe';
 import FetchLineItemsError from '../FetchLineItemsError/FetchLineItemsError.js';
@@ -47,6 +48,7 @@ const NylasBookingForm = props => {
     className,
     listingId,
     isOwnListing,
+    price,
     onFetchTransactionLineItems,
     lineItems,
     fetchLineItemsInProgress,
@@ -285,7 +287,9 @@ const NylasBookingForm = props => {
               <EstimatedCustomerBreakdownMaybe
                 lineItems={lineItems}
                 timeZone={timeZone}
+                currency={price?.currency}
                 marketplaceName={marketplaceName}
+                processName={BOOKING_PROCESS_NAME}
               />
             ) : null}
 
