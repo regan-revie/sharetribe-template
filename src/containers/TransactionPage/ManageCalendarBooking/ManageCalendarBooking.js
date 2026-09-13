@@ -8,11 +8,7 @@ import {
   nylasCancelBooking,
   nylasRescheduleBooking,
 } from '../../../util/api';
-import {
-  formatDayLabel,
-  formatSlotTime,
-  groupSlotsByDay,
-} from '../../../components/OrderPanel/NylasBookingForm/nylasSlots';
+import NylasSlotPicker from '../../../components/OrderPanel/NylasBookingForm/NylasSlotPicker';
 
 import { H4, PrimaryButton, SecondaryButton, InlineTextButton } from '../../../components';
 
@@ -41,7 +37,6 @@ const ManageCalendarBooking = ({ transactionId: transactionIdMaybe, listingId: l
   const [status, setStatus] = useState({ state: 'loading' });
   const [mode, setMode] = useState('idle'); // 'idle' | 'confirm-cancel' | 'reschedule'
   const [availability, setAvailability] = useState({ state: 'idle', slots: [] });
-  const [selectedDayKey, setSelectedDayKey] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [actionError, setActionError] = useState(null);
 
@@ -102,7 +97,6 @@ const ManageCalendarBooking = ({ transactionId: transactionIdMaybe, listingId: l
       .then(() => {
         setActionInProgress(false);
         setMode('idle');
-        setSelectedDayKey(null);
         loadStatus();
       })
       .catch(e => {
@@ -126,9 +120,6 @@ const ManageCalendarBooking = ({ transactionId: transactionIdMaybe, listingId: l
           new Date(status.bookingEnd)
         )}`
       : null;
-
-  const days = groupSlotsByDay(availability.slots, timeZone);
-  const activeDay = days.find(d => d.dayKey === selectedDayKey) || days[0];
 
   return (
     <div className={css.root}>
@@ -179,38 +170,18 @@ const ManageCalendarBooking = ({ transactionId: transactionIdMaybe, listingId: l
         <div className={css.reschedule}>
           {availability.state === 'loading' ? (
             <p><FormattedMessage id="ManageCalendarBooking.loadingSlots" /></p>
-          ) : availability.state === 'error' || days.length === 0 ? (
+          ) : availability.state === 'error' || availability.slots.length === 0 ? (
             <p className={css.error}>
               <FormattedMessage id="ManageCalendarBooking.noSlots" />
             </p>
           ) : (
-            <>
-              <div className={css.dayTabs}>
-                {days.map(d => (
-                  <button
-                    key={d.dayKey}
-                    type="button"
-                    className={d.dayKey === activeDay?.dayKey ? css.dayTabActive : css.dayTab}
-                    onClick={() => setSelectedDayKey(d.dayKey)}
-                  >
-                    {formatDayLabel(d.dayKey, timeZone)}
-                  </button>
-                ))}
-              </div>
-              <div className={css.slotList}>
-                {(activeDay?.slots || []).map(slot => (
-                  <button
-                    key={slot.start}
-                    type="button"
-                    disabled={actionInProgress}
-                    className={css.slotButton}
-                    onClick={() => handleReschedule(slot)}
-                  >
-                    {formatSlotTime(slot.start, timeZone)}
-                  </button>
-                ))}
-              </div>
-            </>
+            // Same calendar + time-list picker as the original booking flow (NylasBookingForm),
+            // so a client picks a new time the same way they picked the first one.
+            <NylasSlotPicker
+              slots={availability.slots}
+              timeZone={timeZone}
+              onSelectSlot={handleReschedule}
+            />
           )}
           <SecondaryButton disabled={actionInProgress} onClick={() => setMode('idle')}>
             <FormattedMessage id="ManageCalendarBooking.cancelRescheduleButton" />

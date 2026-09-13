@@ -1,0 +1,59 @@
+/* Calendar and times side by side on desktop, stacked on mobile. The order panel (and the
+   reschedule panel it is shared with) is narrow on small screens, so a two-column grid there would
+   squeeze the month grid unreadably. */
+.picker {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (--viewportMedium) {
+  .picker {
+    grid-template-columns: minmax(0, 1fr) 150px;
+  }
+}
+
+.dayColumn {
+  min-width: 0;
+}
+
+.timeColumn {
+  min-width: 0;
+}
+
+.heading {
+  margin: 0 0 8px 0;
+}
+
+/* Capped so a coach with a month of availability cannot push whatever follows this component off
+   the page; the list scrolls instead. */
+.timeList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.slot {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--colorGrey300);
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorWhite);
+  cursor: pointer;
+  font-weight: var(--fontWeightMedium);
+}
+
+.slot:hover {
+  border-color: var(--colorGrey700);
+}
+
+.slotSelected {
+  border-color: var(--marketplaceColor);
+  background-color: var(--marketplaceColor);
+  color: var(--colorWhite);
+}

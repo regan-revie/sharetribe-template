@@ -2,25 +2,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Form as FinalForm } from 'react-final-form';
 import classNames from 'classnames';
 
-import { FormattedMessage, useIntl } from '../../../util/reactIntl';
+import { FormattedMessage } from '../../../util/reactIntl';
 import { getDefaultTimeZoneOnBrowser, getTimeZoneNames } from '../../../util/dates';
 import { nylasAvailability } from '../../../util/api';
 
-import { Form, H6, PrimaryButton } from '../../../components';
-import { DatePicker } from '../../DatePicker/DatePickers';
-import { getISODateString } from '../../DatePicker/DatePickers/DatePicker.helpers';
+import { Form, PrimaryButton } from '../../../components';
 import { BOOKING_PROCESS_NAME } from '../../../transactions/transaction';
 
 import EstimatedCustomerBreakdownMaybe from '../EstimatedCustomerBreakdownMaybe';
 import FetchLineItemsError from '../FetchLineItemsError/FetchLineItemsError.js';
+import NylasSlotPicker from './NylasSlotPicker';
 
-import {
-  groupSlotsByDay,
-  dayKeyOf,
-  formatDayLabel,
-  formatSlotTime,
-  slotMatchesVariant,
-} from './nylasSlots';
+import { groupSlotsByDay, slotMatchesVariant } from './nylasSlots';
 import css from './NylasBookingForm.module.css';
 
 /**
@@ -62,23 +55,16 @@ const NylasBookingForm = props => {
     ...rest
   } = props;
 
-  const intl = useIntl();
   const [availability, setAvailability] = useState({
     status: 'loading',
     slots: [],
     connected: true,
   });
   const [timeZone, setTimeZone] = useState(() => getDefaultTimeZoneOnBrowser());
-  const [selectedDayKey, setSelectedDayKey] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   const listingIdString = listingId?.uuid || listingId;
 
-  // getISODateString is the calendar's own key for a cell: local Y/M/D, not an instant formatted in
-  // another zone. Formatting local midnight in a zone behind the browser would roll it to the
-  // previous day and block the wrong cells, so reuse the calendar's convention rather than
-  // reimplementing it and hoping the two agree.
-  const localDayKey = getISODateString;
   const timeZoneNames = useMemo(() => getTimeZoneNames(), []);
 
   useEffect(() => {
@@ -155,8 +141,6 @@ const NylasBookingForm = props => {
         // chosen variant would charge for one length and book another.
         const matching = availability.slots.filter(s => slotMatchesVariant(s, chosenVariant));
         const days = groupSlotsByDay(matching, timeZone);
-        const availableDayKeys = new Set(days.map(d => d.dayKey));
-        const activeDay = days.find(d => d.dayKey === selectedDayKey) || days[0];
 
         const showBreakdown = selectedSlot && lineItems && !fetchLineItemsInProgress;
 
@@ -204,55 +188,17 @@ const NylasBookingForm = props => {
             ) : null}
 
             {notReady || (
-              <div className={css.picker}>
-                <div className={css.dayColumn}>
-                  <DatePicker
-                    range={false}
-                    showMonthStepper={true}
-                    // A Date or null, never an array: for range={false} the calendar ignores
-                    // anything else, and the selection then cannot move off the first day.
-                    // Midday avoids a midnight value landing on the previous day.
-                    value={activeDay ? new Date(`${activeDay.dayKey}T12:00:00`) : null}
-                    // A day with no slots is not selectable, so the shape of a coach's availability
-                    // is visible at a glance rather than discovered by clicking through empty days.
-                    isDayBlocked={day => !availableDayKeys.has(localDayKey(day))}
-                    onChange={value => {
-                      const picked = Array.isArray(value) ? value[0] : value;
-                      if (!picked) return;
-                      setSelectedDayKey(localDayKey(picked));
-                      clearSelection(form);
-                    }}
-                  />
-                </div>
-
-                <div className={css.timeColumn}>
-                  <H6 as="h3" className={css.heading}>
-                    {activeDay
-                      ? formatDayLabel(activeDay.dayKey, timeZone, intl.locale)
-                      : intl.formatMessage({
-                          id: 'NylasBookingForm.pickTime',
-                          defaultMessage: 'Choose a time',
-                        })}
-                  </H6>
-                  <ol className={css.timeList}>
-                    {(activeDay ? activeDay.slots : []).map(slot => {
-                      const isActive = selectedSlot && slot.start === selectedSlot.start;
-                      return (
-                        <li key={slot.start}>
-                          <button
-                            type="button"
-                            className={classNames(css.slot, { [css.slotSelected]: isActive })}
-                            aria-pressed={isActive}
-                            onClick={() => handleSlotSelect(slot, values.priceVariantName, form)}
-                          >
-                            {formatSlotTime(slot.start, timeZone, intl.locale)}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                </div>
-              </div>
+              // Remounts on a timezone change (via key), which resets its internally-held day
+              // selection - day boundaries move with the zone, so a previously chosen day may no
+              // longer exist. clearSelection below only needs to clear the *slot*.
+              <NylasSlotPicker
+                key={timeZone}
+                slots={matching}
+                timeZone={timeZone}
+                selectedSlot={selectedSlot}
+                onSelectSlot={slot => handleSlotSelect(slot, values.priceVariantName, form)}
+                onDayChange={() => clearSelection(form)}
+              />
             )}
 
             {/* Stated and changeable rather than assumed. A client booking while travelling wants
@@ -269,9 +215,8 @@ const NylasBookingForm = props => {
                 value={timeZone}
                 onChange={e => {
                   setTimeZone(e.target.value);
-                  // Day boundaries move with the zone, so a previously chosen day may no longer
-                  // exist and the selected slot may now sit on a different date.
-                  setSelectedDayKey(null);
+                  // The selected slot may no longer make sense on the new zone's day boundaries.
+                  // NylasSlotPicker's own day selection resets itself, via its key={timeZone}.
                   clearSelection(form);
                 }}
               >
